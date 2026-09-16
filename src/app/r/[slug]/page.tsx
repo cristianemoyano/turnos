@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { Business, Service, Professional } from "@/lib/associations";
+import { dateKeyInTz } from "@/lib/tz";
 import BookingClient from "./BookingClient";
 
 export async function generateMetadata({
@@ -43,6 +44,7 @@ export default async function PublicBookingPage({
       slug={business.slug}
       businessName={business.name}
       timezone={business.timezone}
+      todayKey={dateKeyInTz(new Date(), business.timezone)}
       services={services.map((s) => ({
         id: s.id,
         name: s.name,

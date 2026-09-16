@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { Op } from "sequelize";
 import { z } from "zod";
 import sequelize from "@/lib/db";
-import { Business, Service, Client, Appointment, Professional } from "@/lib/associations";
+import { Business, Service, ServiceSegment, Client, Appointment, Professional, BusinessHours } from "@/lib/associations";
+import { rangesOverlap, wallClockMinutes, workRangesMs } from "@/modules/agenda/segments";
+import { segmentsFromService, weekdayForDate } from "@/modules/agenda/availability.service";
+import { whyDoesNotFit } from "@/modules/agenda/slot-fit";
+import { formatTimeInTz } from "@/lib/format";
+import { dateKeyInTz, isStartInPast } from "@/lib/tz";
 
 const bodySchema = z.object({
   serviceId: z.string().uuid(),
@@ -44,25 +49,58 @@ export async function POST(
 
   const service = await Service.findOne({
     where: { id: serviceId, business_id: business.id, active: true },
+    include: [{ model: ServiceSegment, as: "segments" }],
   });
   if (!service) {
     return NextResponse.json({ error: "Servicio no encontrado", code: "SERVICE_NOT_FOUND" }, { status: 404 });
   }
 
   let resolvedProfessionalId: string | null = null;
+  let resolvedProfessionalName: string | null = null;
   if (professionalId) {
     const professional = await Professional.findOne({ where: { id: professionalId, business_id: business.id } });
     if (!professional) {
       return NextResponse.json({ error: "Profesional no encontrado", code: "PROFESSIONAL_NOT_FOUND" }, { status: 404 });
     }
     resolvedProfessionalId = professional.id;
+    resolvedProfessionalName = professional.name || null;
   }
 
   const start = new Date(startAt);
-  const end = new Date(start.getTime() + service.duration_minutes * 60_000);
+  if (isStartInPast(start)) {
+    return NextResponse.json(
+      { error: "Ese horario ya no está disponible", code: "PAST_SLOT" },
+      { status: 409 },
+    );
+  }
+  const segments = segmentsFromService(service);
+  const durationMinutes = wallClockMinutes(service.duration_minutes, segments);
+  const candidateWork = workRangesMs(start.getTime(), durationMinutes, segments);
+  const end = new Date(start.getTime() + durationMinutes * 60_000);
+
+  const dateKey = dateKeyInTz(start, business.timezone);
+  const hours = await BusinessHours.findOne({
+    where: { business_id: business.id, day_of_week: weekdayForDate(dateKey) },
+  });
+  const publicFit = whyDoesNotFit(hours?.is_open ? (hours.shifts ?? []) : [], formatTimeInTz(start, business.timezone), durationMinutes);
+  if (!hours?.is_open || publicFit) {
+    return NextResponse.json(
+      { error: "Ese horario no está disponible para reserva online", code: "OUTSIDE_HOURS" },
+      { status: 409 },
+    );
+  }
 
   try {
     const appointment = await sequelize.transaction(async (t) => {
+      const professionals = resolvedProfessionalId
+        ? []
+        : await Professional.findAll({
+            where: { business_id: business.id },
+            attributes: ["id", "name"],
+            order: [["created_at", "ASC"]],
+            transaction: t,
+          });
+
       const candidates = await Appointment.findAll({
         where: {
           business_id: business.id,
@@ -70,20 +108,32 @@ export async function POST(
           start_at: { [Op.lt]: end },
           // A specific professional is only occupied by their own bookings
           // plus anything business-wide (professional_id null); booking with
-          // no professional chosen is itself business-wide and must not
-          // collide with anyone.
+          // no professional chosen yet must see everyone's rows so we can
+          // assign the first person actually free at this slot.
           ...(resolvedProfessionalId
             ? { [Op.or]: [{ professional_id: null }, { professional_id: resolvedProfessionalId }] }
             : {}),
         },
+        include: [{ model: Service, as: "service", include: [{ model: ServiceSegment, as: "segments" }] }],
         transaction: t,
         lock: t.LOCK.UPDATE,
       });
-      const hasConflict = candidates.some(
-        (a) => a.start_at.getTime() + a.duration_minutes * 60_000 > start.getTime(),
+      const overlapping = candidates.filter((a) =>
+        rangesOverlap(
+          candidateWork,
+          workRangesMs(a.start_at.getTime(), a.duration_minutes, segmentsFromService(a.get("service"))),
+        ),
       );
-      if (hasConflict) {
-        throw new Error("SLOT_TAKEN");
+
+      if (resolvedProfessionalId) {
+        if (overlapping.length > 0) throw new Error("SLOT_TAKEN");
+      } else {
+        const free = professionals.find(
+          (p) => !overlapping.some((a) => a.professional_id === null || a.professional_id === p.id),
+        );
+        if (professionals.length > 0 && !free) throw new Error("SLOT_TAKEN");
+        resolvedProfessionalId = free?.id ?? null;
+        resolvedProfessionalName = free?.name || null;
       }
 
       let client = await Client.findOne({
@@ -107,7 +157,7 @@ export async function POST(
           status: "confirmed",
           source: "online",
           start_at: start,
-          duration_minutes: service.duration_minutes,
+          duration_minutes: durationMinutes,
           price: service.price,
           deposit_required: service.deposit_amount,
         },
@@ -126,6 +176,7 @@ export async function POST(
             timeZone: business.timezone,
           }).format(appointment.start_at),
           dayLabel: dayLabelFor(appointment.start_at, business.timezone),
+          professionalName: resolvedProfessionalName,
         },
       },
       { status: 201 },

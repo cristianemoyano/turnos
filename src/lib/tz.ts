@@ -66,6 +66,19 @@ export function localMinutesInTz(date: Date, timeZone: string): number {
   return h * 60 + m;
 }
 
+/** True when `startAt` is strictly before `now` (instant comparison). */
+export function isStartInPast(startAt: Date, now = new Date()): boolean {
+  return startAt.getTime() < now.getTime();
+}
+
+/**
+ * Cutoff for bookable slot starts on `dateKey`. Today and earlier drop
+ * anything before `now`; future calendar days have no cutoff.
+ */
+export function availabilityAfter(dateKey: string, timeZone: string, now = new Date()): Date | undefined {
+  return dateKey <= dateKeyInTz(now, timeZone) ? now : undefined;
+}
+
 export function dateLabelInTz(date: Date, timeZone: string): string {
   const label = new Intl.DateTimeFormat("es-AR", {
     weekday: "long",

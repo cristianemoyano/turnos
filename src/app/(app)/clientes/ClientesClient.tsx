@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Fab } from "@/components/layout/Fab";
 import { Input } from "@/components/primitives/Input";
 import { Badge } from "@/components/primitives/Badge";
 import { ClientSheet } from "./ClientSheet";
+import { NewClientSheet } from "./NewClientSheet";
 
 type ApiClient = {
   id: string;
@@ -27,6 +29,7 @@ export default function ClientesClient() {
   const [clients, setClients] = useState<ApiClient[]>([]);
   const [loading, setLoading] = useState(true);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [newOpen, setNewOpen] = useState(false);
   const [refresh, setRefresh] = useState(0);
 
   useEffect(() => {
@@ -47,14 +50,18 @@ export default function ClientesClient() {
   }, [search, refresh]);
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
+    <div className="flex flex-1 flex-col overflow-hidden relative">
       <div className="flex-none px-5 pt-4.5 pb-3 border-b-2 border-divider flex flex-col gap-2.5">
         <h2 className="text-2xl">Clientes</h2>
         <Input placeholder="Buscar por nombre" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
       <div className="flex-1 overflow-auto pb-16">
         {!loading && clients.length === 0 && (
-          <p className="p-5 text-sm opacity-55">No hay clientes todavía.</p>
+          <p className="p-5 text-sm opacity-55">
+            {search.trim()
+              ? "Ningún cliente coincide con la búsqueda."
+              : "No hay clientes todavía. Tocá + para agregar el primero."}
+          </p>
         )}
         {clients.map((c) => (
           <button
@@ -77,6 +84,8 @@ export default function ClientesClient() {
           </button>
         ))}
       </div>
+      <Fab aria-label="Nuevo cliente" onClick={() => setNewOpen(true)} />
+      <NewClientSheet open={newOpen} onOpenChange={setNewOpen} onCreated={() => setRefresh((r) => r + 1)} />
       <ClientSheet
         clientId={openId}
         open={!!openId}

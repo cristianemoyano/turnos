@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireBusiness } from "@/lib/api-auth";
-import { Service } from "@/lib/associations";
+import { Service, ServiceSegment } from "@/lib/associations";
+import type { ServiceSegment as ServiceSegmentModel } from "@/modules/catalog/service-segment.model";
 
 const updateSchema = z.object({
   name: z.string().trim().min(1).max(200).optional(),
@@ -25,12 +26,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     );
   }
 
-  const service = await Service.findOne({ where: { id, business_id: ctx.businessId } });
+  const service = await Service.findOne({
+    where: { id, business_id: ctx.businessId },
+    include: [{ model: ServiceSegment, as: "segments" }],
+  });
   if (!service) return NextResponse.json({ error: "Servicio no encontrado", code: "NOT_FOUND" }, { status: 404 });
 
   const { name, duration_minutes, price, deposit_amount, active } = parsed.data;
   if (name !== undefined) service.name = name;
-  if (duration_minutes !== undefined) service.duration_minutes = duration_minutes;
+  const segments = (service.get("segments") as ServiceSegmentModel[] | undefined) ?? [];
+  if (segments.length > 0) {
+    // Etapas own the duration — a leftover "Duración" on the service form
+    // must not desync it from trabajo + espera.
+    service.duration_minutes = segments.reduce((sum, s) => sum + s.duration_minutes, 0);
+  } else if (duration_minutes !== undefined) {
+    service.duration_minutes = duration_minutes;
+  }
   if (price !== undefined) service.price = String(price);
   if (deposit_amount !== undefined) service.deposit_amount = deposit_amount != null ? String(deposit_amount) : null;
   if (active !== undefined) service.active = active;

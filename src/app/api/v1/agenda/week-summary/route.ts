@@ -45,7 +45,8 @@ export async function GET(req: Request) {
     const anchor = dayBoundsInTz(dateKey, business.timezone).start;
     const weekday = weekdayInTz(anchor, business.timezone);
     const isOpen = hoursByDay.get(weekday)?.is_open ?? false;
-    return { date: dateKey, isOpen, count: counts.get(dateKey) ?? 0 };
+    const shifts = hoursByDay.get(weekday)?.shifts ?? [];
+    return { date: dateKey, isOpen, count: counts.get(dateKey) ?? 0, shifts };
   });
 
   return NextResponse.json({ data: result });

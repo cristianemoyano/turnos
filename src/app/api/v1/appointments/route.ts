@@ -4,8 +4,9 @@ import { Op } from "sequelize";
 import sequelize from "@/lib/db";
 import { requireBusiness } from "@/lib/api-auth";
 import { Appointment, Business, Client, Professional, Service, ServiceSegment } from "@/lib/associations";
-import { zonedTimeToUtc, hasConflict } from "@/modules/agenda/availability.service";
-import type { ServiceSegment as ServiceSegmentModel } from "@/modules/catalog/service-segment.model";
+import { zonedTimeToUtc, hasConflict, segmentsFromService } from "@/modules/agenda/availability.service";
+import { wallClockMinutes } from "@/modules/agenda/segments";
+import { isStartInPast } from "@/lib/tz";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -52,6 +53,8 @@ const appointmentSchema = z.object({
   service_id: z.string().uuid(),
   start_at: z.string().min(1),
   source: z.enum(["staff", "online"]).optional(),
+  // Past visits may be logged as already attended; live bookings omit this.
+  status: z.literal("done").optional(),
 });
 
 const blockSchema = z.object({
@@ -104,6 +107,23 @@ export async function POST(req: Request) {
     return NextResponse.json({ data: block }, { status: 201 });
   }
 
+  const pastStart = isStartInPast(startAt);
+  if (pastStart && input.status !== "done") {
+    return NextResponse.json(
+      {
+        error: "No se puede crear un turno en un horario que ya pasó. Si ya se atendió, registralo como visita olvidada.",
+        code: "PAST_SLOT",
+      },
+      { status: 409 },
+    );
+  }
+  if (!pastStart && input.status === "done") {
+    return NextResponse.json(
+      { error: "Solo se puede registrar como atendida una visita que ya ocurrió.", code: "VALIDATION_ERROR" },
+      { status: 422 },
+    );
+  }
+
   if (!input.client_id && !input.client) {
     return NextResponse.json(
       { error: "Debe indicar un cliente existente o los datos de un cliente nuevo", code: "VALIDATION_ERROR" },
@@ -118,12 +138,10 @@ export async function POST(req: Request) {
   if (!service) {
     return NextResponse.json({ error: "Servicio no encontrado", code: "NOT_FOUND" }, { status: 404 });
   }
-  const segments = (service.get("segments") as ServiceSegmentModel[] | undefined) ?? [];
-  const totalDuration = segments.length
-    ? segments.reduce((sum, s) => sum + s.duration_minutes, 0)
-    : service.duration_minutes;
+  const segments = segmentsFromService(service);
+  const totalDuration = wallClockMinutes(service.duration_minutes, segments);
 
-  if (await hasConflict(ctx.businessId, startAt, totalDuration, input.professional_id ?? null)) {
+  if (await hasConflict(ctx.businessId, startAt, totalDuration, input.professional_id ?? null, undefined, segments)) {
     return NextResponse.json({ error: "Ese horario ya está ocupado", code: "SLOT_TAKEN" }, { status: 409 });
   }
 
@@ -146,6 +164,7 @@ export async function POST(req: Request) {
       }
 
       const source = input.source ?? "staff";
+      const status = input.status === "done" ? "done" : source === "online" ? "confirmed" : "pending";
       return Appointment.create(
         {
           business_id: ctx.businessId,
@@ -156,7 +175,8 @@ export async function POST(req: Request) {
           // Staff-created bookings start pending — the client themselves must
           // confirm (via the WhatsApp link) before it counts as guaranteed.
           // Online self-bookings are already a confirming action by nature.
-          status: source === "online" ? "confirmed" : "pending",
+          // Forgotten past visits are logged already attended (`done`).
+          status,
           source,
           start_at: startAt,
           duration_minutes: totalDuration,

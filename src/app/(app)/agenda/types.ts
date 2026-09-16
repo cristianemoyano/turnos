@@ -14,7 +14,13 @@ export type RawAppointment = {
   deposit_required: string | null;
   deposit_paid: boolean;
   client?: { id: string; name: string; phone: string | null } | null;
-  service?: { id: string; name: string; duration_minutes: number; price: string } | null;
+  service?: {
+    id: string;
+    name: string;
+    duration_minutes: number;
+    price: string;
+    segments?: ServiceSegmentInfo[];
+  } | null;
   professional?: { id: string; name: string } | null;
 };
 
@@ -29,6 +35,7 @@ export type ServiceInfo = {
   segments?: ServiceSegmentInfo[];
 };
 export type DayHours = { dayOfWeek: string; isOpen: boolean; shifts: { from: string; to: string }[] };
+export type DayShift = { from: string; to: string };
 export type BookingData = {
   professionals: Professional[];
   services: ServiceInfo[];
@@ -36,8 +43,8 @@ export type BookingData = {
 };
 
 export type SheetState =
-  | { type: "slot"; time: string }
-  | { type: "appointment"; appointment: RawAppointment }
+  | { type: "slot"; time: string; overtime?: boolean }
+  | { type: "appointment"; appointment: RawAppointment; stageLabel?: string }
   | { type: "block"; appointment: RawAppointment }
-  | { type: "new"; presetTime?: string }
+  | { type: "new"; presetTime?: string; overtime?: boolean; forgotten?: boolean }
   | null;

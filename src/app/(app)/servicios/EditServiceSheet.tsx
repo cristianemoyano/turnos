@@ -12,6 +12,7 @@ type ApiService = {
   duration_minutes: number;
   price: string;
   deposit_amount: string | null;
+  segments?: { id: string }[];
 };
 
 export function EditServiceSheet({
@@ -47,6 +48,8 @@ export function EditServiceSheet({
 
   if (!service) return null;
 
+  const hasEtapas = (service.segments?.length ?? 0) > 0;
+
   async function save() {
     setSaving(true);
     try {
@@ -55,7 +58,7 @@ export function EditServiceSheet({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
-          duration_minutes: Number(duration) || 30,
+          ...(hasEtapas ? {} : { duration_minutes: Number(duration) || 30 }),
           price: Number(price) || 0,
           deposit_amount: deposit.trim() ? Number(deposit) : null,
         }),
@@ -85,9 +88,18 @@ export function EditServiceSheet({
       <FormField label="Nombre" htmlFor="es-name">
         <Input id="es-name" value={name} onChange={(e) => setName(e.target.value)} />
       </FormField>
-      <FormField label="Duración (min)" htmlFor="es-duration">
-        <Input id="es-duration" type="number" value={duration} onChange={(e) => setDuration(e.target.value)} />
-      </FormField>
+      {hasEtapas ? (
+        <FormField
+          label="Duración"
+          hint="La suma de las etapas (el cliente está todo ese tiempo; las esperas no ocupan al profesional). Cambiala en Etapas."
+        >
+          <p className="text-sm m-0 py-1.5">{service.duration_minutes} min</p>
+        </FormField>
+      ) : (
+        <FormField label="Duración (min)" htmlFor="es-duration">
+          <Input id="es-duration" type="number" min={1} value={duration} onChange={(e) => setDuration(e.target.value)} />
+        </FormField>
+      )}
       <FormField label="Precio" htmlFor="es-price">
         <Input id="es-price" type="number" value={price} onChange={(e) => setPrice(e.target.value)} />
       </FormField>

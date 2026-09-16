@@ -4,7 +4,9 @@ import { requireBusiness } from "@/lib/api-auth";
 import { Client, Appointment, Service } from "@/lib/associations";
 
 const updateSchema = z.object({
-  notes: z.string().max(2000).nullable(),
+  name: z.string().trim().min(1).max(200).optional(),
+  phone: z.string().trim().max(30).optional().nullable(),
+  notes: z.string().max(2000).optional().nullable(),
 });
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -43,7 +45,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const client = await Client.findOne({ where: { id, business_id: ctx.businessId } });
   if (!client) return NextResponse.json({ error: "Cliente no encontrado", code: "NOT_FOUND" }, { status: 404 });
 
-  client.notes = parsed.data.notes;
+  if (parsed.data.name !== undefined) client.name = parsed.data.name;
+  if (parsed.data.phone !== undefined) client.phone = parsed.data.phone || null;
+  if (parsed.data.notes !== undefined) client.notes = parsed.data.notes;
   await client.save();
   return NextResponse.json({ data: client });
 }

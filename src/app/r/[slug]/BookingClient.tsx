@@ -6,7 +6,7 @@ import { Input } from "@/components/primitives/Input";
 import { FormField } from "@/components/primitives/FormField";
 import { Card, CardTitle, CardBody } from "@/components/primitives/Card";
 import { money } from "@/lib/format";
-import { dateKeyInTz, zonedTimeToUtc } from "@/lib/tz";
+import { zonedTimeToUtc } from "@/lib/tz";
 
 interface ServiceDTO {
   id: string;
@@ -26,19 +26,23 @@ interface DayOption {
 }
 
 type Step = 1 | 2 | 3 | 4;
+type BookingMode = "professional" | "anyone";
 
-function shortDayLabel(date: Date, timezone: string, index: number): string {
-  if (index === 0) return "Hoy";
-  if (index === 1) return "Mañana";
-  const raw = new Intl.DateTimeFormat("es-AR", { weekday: "short", timeZone: timezone }).format(date);
-  const clean = raw.replace(/\.$/, "");
-  return clean.charAt(0).toUpperCase() + clean.slice(1);
+const WEEKDAY_SHORT = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+
+function shiftDateKey(dateKey: string, days: number): string {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + days));
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
 }
 
-function buildDayOptions(timezone: string): DayOption[] {
+function buildDayOptions(todayKey: string): DayOption[] {
   return Array.from({ length: 5 }).map((_, i) => {
-    const date = new Date(Date.now() + i * 86_400_000);
-    return { ymd: dateKeyInTz(date, timezone), label: shortDayLabel(date, timezone, i) };
+    const ymd = shiftDateKey(todayKey, i);
+    const [y, m, d] = ymd.split("-").map(Number);
+    const weekday = new Date(Date.UTC(y, (m || 1) - 1, d || 1)).getUTCDay();
+    const label = i === 0 ? "Hoy" : i === 1 ? "Mañana" : WEEKDAY_SHORT[weekday];
+    return { ymd, label };
   });
 }
 
@@ -46,21 +50,24 @@ export default function BookingClient({
   slug,
   businessName,
   timezone,
+  todayKey,
   services,
   professionals,
 }: {
   slug: string;
   businessName: string;
   timezone: string;
+  todayKey: string;
   services: ServiceDTO[];
   professionals: ProfessionalDTO[];
 }) {
   const [step, setStep] = useState<Step>(1);
   const [selectedService, setSelectedService] = useState<ServiceDTO | null>(null);
   const needsProfessional = professionals.length > 1;
+  const [bookingMode, setBookingMode] = useState<BookingMode | null>(null);
   const [selectedProfessionalId, setSelectedProfessionalId] = useState<string | null>(null);
 
-  const dayOptions = useMemo(() => buildDayOptions(timezone), [timezone]);
+  const dayOptions = useMemo(() => buildDayOptions(todayKey), [todayKey]);
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
   const [slotsByKey, setSlotsByKey] = useState<{ key: string; slots: string[] } | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
@@ -70,12 +77,20 @@ export default function BookingClient({
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState("");
 
-  const [result, setResult] = useState<{ serviceName: string; dayLabel: string; time: string } | null>(null);
+  const [result, setResult] = useState<{
+    serviceName: string;
+    dayLabel: string;
+    time: string;
+    professionalName: string | null;
+  } | null>(null);
 
   const selectedDay = dayOptions[selectedDayIndex];
-  const professionalChosen = !needsProfessional || !!selectedProfessionalId;
+  const showModePicker = needsProfessional && bookingMode === null;
+  const showProfessionalPicker = bookingMode === "professional";
+  const professionalChosen = bookingMode === "anyone" || !!selectedProfessionalId;
+  const showTimes = bookingMode !== null && professionalChosen;
   const slotsKey =
-    selectedService && selectedDay && professionalChosen
+    selectedService && selectedDay && showTimes
       ? `${selectedService.id}:${selectedDay.ymd}:${selectedProfessionalId ?? "any"}`
       : null;
   const slotsLoading = step === 2 && slotsKey !== null && slotsByKey?.key !== slotsKey;
@@ -102,11 +117,20 @@ export default function BookingClient({
 
   function selectService(service: ServiceDTO) {
     setSelectedService(service);
+    setBookingMode(needsProfessional ? null : "anyone");
     setSelectedProfessionalId(null);
     setSelectedDayIndex(0);
     setSelectedSlot(null);
     setServerError("");
     setStep(2);
+  }
+
+  function selectMode(mode: BookingMode) {
+    setBookingMode(mode);
+    setSelectedProfessionalId(null);
+    setSelectedSlot(null);
+    setSelectedDayIndex(0);
+    setServerError("");
   }
 
   function selectDay(index: number) {
@@ -118,6 +142,21 @@ export default function BookingClient({
     setSelectedSlot(slot);
     setServerError("");
     setStep(3);
+  }
+
+  function goBackFromStep2() {
+    if (showTimes && bookingMode === "professional" && selectedProfessionalId) {
+      setSelectedProfessionalId(null);
+      setSelectedSlot(null);
+      return;
+    }
+    if (needsProfessional && bookingMode !== null) {
+      setBookingMode(null);
+      setSelectedProfessionalId(null);
+      setSelectedSlot(null);
+      return;
+    }
+    setStep(1);
   }
 
   async function confirmBooking() {
@@ -137,13 +176,20 @@ export default function BookingClient({
           phone: phone.trim(),
         }),
       });
-      const json: { data?: { serviceName: string; dayLabel: string; time: string }; error?: string } =
-        await res.json();
+      const json: {
+        data?: { serviceName: string; dayLabel: string; time: string; professionalName?: string | null };
+        error?: string;
+      } = await res.json();
       if (!res.ok || !json.data) {
         setServerError(json.error ?? "No pudimos reservar el turno. Probá de nuevo.");
         return;
       }
-      setResult(json.data);
+      setResult({
+        serviceName: json.data.serviceName,
+        dayLabel: json.data.dayLabel,
+        time: json.data.time,
+        professionalName: json.data.professionalName ?? null,
+      });
       setStep(4);
     } catch {
       setServerError("No pudimos reservar el turno. Probá de nuevo.");
@@ -155,6 +201,7 @@ export default function BookingClient({
   function resetAll() {
     setStep(1);
     setSelectedService(null);
+    setBookingMode(null);
     setSelectedProfessionalId(null);
     setSelectedDayIndex(0);
     setSlotsByKey(null);
@@ -164,6 +211,10 @@ export default function BookingClient({
     setServerError("");
     setResult(null);
   }
+
+  const selectedProfessionalName = selectedProfessionalId
+    ? professionals.find((p) => p.id === selectedProfessionalId)?.name
+    : null;
 
   return (
     <div className="flex flex-col gap-5 p-4 flex-1">
@@ -202,34 +253,66 @@ export default function BookingClient({
       {step === 2 && selectedService && (
         <section className="flex flex-col gap-4">
           <div>
-            <Button variant="ghost" size="sm" onClick={() => setStep(1)}>
+            <Button variant="ghost" size="sm" onClick={goBackFromStep2}>
               Atrás
             </Button>
           </div>
-          <h2 className="font-heading font-bold text-sm text-text/70">
-            {needsProfessional ? `¿Con quién preferís? — ${selectedService.name}` : `Elegí día y horario — ${selectedService.name}`}
-          </h2>
 
-          {needsProfessional && (
-            <div className="flex flex-wrap gap-2">
-              {professionals.map((p) => (
-                <Button
-                  key={p.id}
-                  type="button"
-                  variant={p.id === selectedProfessionalId ? "primary" : "secondary"}
-                  size="sm"
-                  onClick={() => {
-                    setSelectedProfessionalId(p.id);
-                    setSelectedSlot(null);
-                  }}
-                >
-                  {p.name}
-                </Button>
-              ))}
-            </div>
+          {showModePicker && (
+            <>
+              <h2 className="font-heading font-bold text-sm text-text/70">
+                ¿Cómo querés reservar? — {selectedService.name}
+              </h2>
+              <div className="flex flex-col gap-2">
+                <button type="button" onClick={() => selectMode("professional")} className="text-left w-full cursor-pointer">
+                  <Card className="border border-transparent hover:border-accent transition-colors" elevated>
+                    <CardTitle>Elegir profesional</CardTitle>
+                    <CardBody>Ver la disponibilidad de una persona en particular</CardBody>
+                  </Card>
+                </button>
+                <button type="button" onClick={() => selectMode("anyone")} className="text-left w-full cursor-pointer">
+                  <Card className="border border-transparent hover:border-accent transition-colors" elevated>
+                    <CardTitle>Cualquiera disponible</CardTitle>
+                    <CardBody>Elegí día y horario; te asignamos quien esté libre</CardBody>
+                  </Card>
+                </button>
+              </div>
+            </>
           )}
 
-          {professionalChosen && (
+          {showProfessionalPicker && (
+            <>
+              <h2 className="font-heading font-bold text-sm text-text/70">
+                {professionalChosen
+                  ? `Elegí día y horario — ${selectedService.name}`
+                  : `¿Con quién preferís? — ${selectedService.name}`}
+              </h2>
+              <div className="flex flex-wrap gap-2">
+                {professionals.map((p) => (
+                  <Button
+                    key={p.id}
+                    type="button"
+                    variant={p.id === selectedProfessionalId ? "primary" : "secondary"}
+                    size="sm"
+                    onClick={() => {
+                      setSelectedProfessionalId(p.id);
+                      setSelectedSlot(null);
+                    }}
+                  >
+                    {p.name}
+                  </Button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {bookingMode === "anyone" && (
+            <h2 className="font-heading font-bold text-sm text-text/70">
+              Elegí día y horario — {selectedService.name}
+            </h2>
+          )}
+
+          {showTimes && (
             <>
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {dayOptions.map((day, i) => (
@@ -247,7 +330,10 @@ export default function BookingClient({
               <div className="flex flex-wrap gap-2">
                 {slotsLoading && <p className="text-sm text-text/60">Buscando horarios…</p>}
                 {!slotsLoading && slots.length === 0 && (
-                  <p className="text-sm text-text/60">No hay horarios disponibles para este día.</p>
+                  <p className="text-sm text-text/60">
+                    No hay horarios para {selectedService.name} ({selectedService.durationMinutes} min) este día — no
+                    entra antes del cierre o ya está ocupado.
+                  </p>
                 )}
                 {!slotsLoading &&
                   slots.map((slot) => (
@@ -278,8 +364,12 @@ export default function BookingClient({
           <Card elevated>
             <CardBody>
               {selectedService.name}
-              {selectedProfessionalId && ` · ${professionals.find((p) => p.id === selectedProfessionalId)?.name}`} ·{" "}
-              {selectedDay.label} {selectedSlot}
+              {selectedProfessionalName
+                ? ` · ${selectedProfessionalName}`
+                : needsProfessional && bookingMode === "anyone"
+                  ? " · Cualquiera disponible"
+                  : ""}{" "}
+              · {selectedDay.label} {selectedSlot}
             </CardBody>
           </Card>
           <div className="flex flex-col gap-3">
@@ -325,7 +415,8 @@ export default function BookingClient({
           </div>
           <h2 className="font-heading font-extrabold text-lg">¡Turno reservado!</h2>
           <p className="text-sm text-text/80">
-            {result.serviceName} · {result.dayLabel} {result.time}
+            {result.serviceName}
+            {result.professionalName ? ` · ${result.professionalName}` : ""} · {result.dayLabel} {result.time}
           </p>
           <p className="text-xs text-text/60">
             Te vamos a escribir por WhatsApp para confirmar y recordarte antes del turno.

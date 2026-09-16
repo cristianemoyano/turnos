@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { Sheet } from "@/components/primitives/Sheet";
 import { Button } from "@/components/primitives/Button";
-import { Textarea } from "@/components/primitives/Input";
+import { Input, Textarea } from "@/components/primitives/Input";
+import { FormField } from "@/components/primitives/FormField";
 import { money } from "@/lib/format";
 import { waLink } from "@/lib/whatsapp";
 
@@ -18,11 +19,12 @@ type HistoryAppointment = {
   id: string;
   start_at: string;
   price: string | null;
-  status: "confirmed" | "done" | "cancelled";
+  status: "pending" | "confirmed" | "done" | "cancelled";
   service?: { name: string } | null;
 };
 
 const STATUS_LABEL: Record<string, string> = {
+  pending: "Pendiente",
   confirmed: "Confirmado",
   done: "Atendido",
   cancelled: "Cancelado",
@@ -41,21 +43,28 @@ export function ClientSheet({
 }) {
   const [client, setClient] = useState<ClientRow | null>(null);
   const [appointments, setAppointments] = useState<HistoryAppointment[]>([]);
-  const [note, setNote] = useState("");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!open || !clientId) return;
     let cancelled = false;
     async function load() {
       setLoading(true);
+      setError("");
       const res = await fetch(`/api/v1/clients/${clientId}`);
       const json = await res.json();
       if (cancelled) return;
-      setClient(json.data.client);
-      setAppointments(json.data.appointments ?? []);
-      setNote(json.data.client.notes ?? "");
+      const next: ClientRow | undefined = json.data?.client;
+      setClient(next ?? null);
+      setAppointments(json.data?.appointments ?? []);
+      setName(next?.name ?? "");
+      setPhone(next?.phone ?? "");
+      setNotes(next?.notes ?? "");
       setLoading(false);
     }
     load();
@@ -64,15 +73,31 @@ export function ClientSheet({
     };
   }, [open, clientId]);
 
-  async function saveNote() {
+  async function save() {
     if (!clientId) return;
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setError("El nombre es obligatorio.");
+      return;
+    }
     setSaving(true);
+    setError("");
     try {
-      await fetch(`/api/v1/clients/${clientId}`, {
+      const res = await fetch(`/api/v1/clients/${clientId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ notes: note || null }),
+        body: JSON.stringify({
+          name: trimmed,
+          phone: phone.trim() || null,
+          notes: notes.trim() || null,
+        }),
       });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(json.error ?? "No se pudo guardar.");
+        return;
+      }
+      setClient((c) => (c ? { ...c, name: trimmed, phone: phone.trim() || null, notes: notes.trim() || null } : c));
       onSaved();
     } finally {
       setSaving(false);
@@ -87,26 +112,40 @@ export function ClientSheet({
         <p className="text-sm opacity-60">Cargando...</p>
       ) : (
         <>
-          <h3 className="text-xl">{client.name}</h3>
+          <h3 className="text-xl">Editar cliente</h3>
           <p className="m-0 text-[13px] opacity-65">
-            {client.phone || "Sin teléfono"} · {visits === 1 ? "1 visita" : `${visits} visitas`}
+            {visits === 1 ? "1 visita" : `${visits} visitas`}
           </p>
-          <div className="flex gap-2">
-            <Button asChild variant="secondary" block>
-              <a href={`tel:${(client.phone || "").replace(/\s/g, "")}`}>Llamar</a>
-            </Button>
-            <Button asChild variant="primary" block>
-              <a href={waLink(client.phone, `Hola ${client.name}!`)} target="_blank" rel="noreferrer">
-                WhatsApp
-              </a>
-            </Button>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-text/70">Notas</label>
-            <Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
-          </div>
-          <Button variant="secondary" className="self-start" onClick={saveNote} disabled={saving}>
-            {saving ? "Guardando..." : "Guardar nota"}
+          <FormField label="Nombre" htmlFor="client-name" required>
+            <Input id="client-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
+          </FormField>
+          <FormField label="Teléfono" htmlFor="client-phone">
+            <Input
+              id="client-phone"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              autoComplete="tel"
+            />
+          </FormField>
+          <FormField label="Notas" htmlFor="client-notes">
+            <Textarea id="client-notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </FormField>
+          {error && <p className="text-xs text-accent-700 m-0">{error}</p>}
+          {phone.trim() && (
+            <div className="flex gap-2">
+              <Button asChild variant="secondary" block>
+                <a href={`tel:${phone.replace(/\s/g, "")}`}>Llamar</a>
+              </Button>
+              <Button asChild variant="primary" block>
+                <a href={waLink(phone.trim(), `Hola ${name}!`)} target="_blank" rel="noreferrer">
+                  WhatsApp
+                </a>
+              </Button>
+            </div>
+          )}
+          <Button variant="primary" block onClick={save} disabled={saving || !name.trim()}>
+            {saving ? "Guardando..." : "Guardar"}
           </Button>
           <div className="flex flex-col gap-1">
             <span className="text-[11px] tracking-[0.08em] uppercase opacity-55">Historial</span>
@@ -114,7 +153,7 @@ export function ClientSheet({
             {appointments.map((a) => (
               <div key={a.id} className="text-[13px] opacity-80">
                 {new Date(a.start_at).toLocaleDateString("es-AR")} · {a.service?.name ?? "Servicio"} ·{" "}
-                {money(a.price)} · {STATUS_LABEL[a.status]}
+                {money(a.price)} · {STATUS_LABEL[a.status] ?? a.status}
               </div>
             ))}
           </div>

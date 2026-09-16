@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { Business, Service } from "@/lib/associations";
-import { computeAvailability } from "@/modules/agenda/availability.service";
+import { Business, Service, ServiceSegment } from "@/lib/associations";
+import { computeAvailability, segmentsFromService } from "@/modules/agenda/availability.service";
+import { wallClockMinutes } from "@/modules/agenda/segments";
+import { availabilityAfter } from "@/lib/tz";
 
 const querySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -32,14 +34,15 @@ export async function GET(
 
   const service = await Service.findOne({
     where: { id: serviceId, business_id: business.id, active: true },
-    attributes: ["id", "duration_minutes"],
+    include: [{ model: ServiceSegment, as: "segments" }],
   });
   if (!service) {
     return NextResponse.json({ error: "Servicio no encontrado", code: "SERVICE_NOT_FOUND" }, { status: 404 });
   }
 
-  const isToday = date === new Date().toLocaleDateString("en-CA", { timeZone: business.timezone });
-  const after = isToday ? new Date() : undefined;
+  const after = availabilityAfter(date, business.timezone);
+  const segments = segmentsFromService(service);
+  const durationMinutes = wallClockMinutes(service.duration_minutes, segments);
 
   const times = await computeAvailability(
     business.id,
@@ -47,7 +50,9 @@ export async function GET(
     business.timezone,
     after,
     professionalId,
-    service.duration_minutes,
+    durationMinutes,
+    undefined,
+    segments,
   );
   return NextResponse.json({ data: times });
 }

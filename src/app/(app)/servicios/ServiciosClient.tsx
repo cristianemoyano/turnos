@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Fab } from "@/components/layout/Fab";
 import { Button } from "@/components/primitives/Button";
 import { Badge } from "@/components/primitives/Badge";
 import { money } from "@/lib/format";
@@ -15,7 +16,7 @@ type ApiService = {
   price: string;
   deposit_amount: string | null;
   active: boolean;
-  segments?: { id: string }[];
+  segments?: { id: string; type: "work" | "wait"; duration_minutes: number }[];
 };
 
 export default function ServiciosClient() {
@@ -52,23 +53,13 @@ export default function ServiciosClient() {
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex-none px-5 pt-4.5 pb-3 border-b-2 border-divider flex items-center justify-between">
+    <div className="flex flex-1 flex-col overflow-hidden relative">
+      <div className="flex-none px-5 pt-4.5 pb-3 border-b-2 border-divider">
         <h2 className="text-2xl">Servicios</h2>
-        <Button
-          variant="secondary"
-          size="icon"
-          aria-label="Nuevo servicio"
-          onClick={() => setNewOpen(true)}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-        </Button>
       </div>
       <div className="flex-1 overflow-auto pb-16">
         {!loading && services.length === 0 && (
-          <p className="p-5 text-sm opacity-55">No hay servicios todavía.</p>
+          <p className="p-5 text-sm opacity-55">No hay servicios todavía. Tocá + para agregar el primero.</p>
         )}
         {services.map((s) => {
           const segmentCount = s.segments?.length ?? 0;
@@ -77,8 +68,10 @@ export default function ServiciosClient() {
               <div className="flex-1 min-w-[140px]">
                 <div className="font-semibold text-sm">{s.name}</div>
                 <div className="text-xs opacity-60">
-                  {segmentCount > 0 && `${segmentCount} etapas · `}
-                  {s.duration_minutes} min · {money(s.price)}
+                  {segmentCount > 0
+                    ? `${s.duration_minutes} min según etapas · ${segmentCount} ${segmentCount === 1 ? "etapa" : "etapas"}`
+                    : `${s.duration_minutes} min`}
+                  {` · ${money(s.price)}`}
                   {s.deposit_amount && ` · Seña ${money(s.deposit_amount)}`}
                 </div>
               </div>
@@ -95,6 +88,7 @@ export default function ServiciosClient() {
           );
         })}
       </div>
+      <Fab aria-label="Nuevo servicio" onClick={() => setNewOpen(true)} />
       <NewServiceSheet open={newOpen} onOpenChange={setNewOpen} onCreated={() => setRefresh((r) => r + 1)} />
       <EditServiceSheet
         service={editing}
@@ -105,6 +99,7 @@ export default function ServiciosClient() {
       <SegmentsSheet
         serviceId={segmentsFor?.id ?? null}
         serviceName={segmentsFor?.name ?? ""}
+        serviceDuration={segmentsFor?.duration_minutes ?? 30}
         open={!!segmentsFor}
         onOpenChange={(open) => !open && setSegmentsFor(null)}
         onSaved={() => setRefresh((r) => r + 1)}

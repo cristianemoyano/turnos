@@ -51,8 +51,12 @@ export function NewServiceSheet({
       <FormField label="Nombre" htmlFor="ns-name">
         <Input id="ns-name" value={name} onChange={(e) => setName(e.target.value)} />
       </FormField>
-      <FormField label="Duración (min)" htmlFor="ns-duration">
-        <Input id="ns-duration" type="number" value={duration} onChange={(e) => setDuration(e.target.value)} />
+      <FormField
+        label="Duración (min)"
+        htmlFor="ns-duration"
+        hint="Cuánto está el cliente. Si hay esperas en el medio (ej. color), después las armás en Etapas y esta duración pasa a ser la suma."
+      >
+        <Input id="ns-duration" type="number" min={1} value={duration} onChange={(e) => setDuration(e.target.value)} />
       </FormField>
       <FormField label="Precio" htmlFor="ns-price">
         <Input id="ns-price" type="number" value={price} onChange={(e) => setPrice(e.target.value)} />
