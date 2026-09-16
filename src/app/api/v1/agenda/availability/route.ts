@@ -10,10 +10,12 @@ export async function GET(req: Request) {
   if ("error" in authResult) return authResult.error;
   const { ctx } = authResult;
 
-  const dateStr = new URL(req.url).searchParams.get("date");
+  const { searchParams } = new URL(req.url);
+  const dateStr = searchParams.get("date");
   if (!dateStr || !DATE_RE.test(dateStr)) {
     return NextResponse.json({ error: "Parámetro date inválido", code: "VALIDATION_ERROR" }, { status: 400 });
   }
+  const professionalId = searchParams.get("professionalId") || undefined;
 
   const business = await Business.findByPk(ctx.businessId, { attributes: ["timezone"] });
   const timeZone = business?.timezone || "America/Argentina/Buenos_Aires";
@@ -23,7 +25,7 @@ export async function GET(req: Request) {
   const after = isToday ? new Date() : undefined;
 
   const [times, services, professionals] = await Promise.all([
-    computeAvailability(ctx.businessId, dateStr, timeZone, after),
+    computeAvailability(ctx.businessId, dateStr, timeZone, after, professionalId),
     Service.findAll({
       where: { business_id: ctx.businessId, active: true },
       include: [{ model: ServiceSegment, as: "segments" }],

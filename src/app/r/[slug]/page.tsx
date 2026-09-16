@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { Business, Service } from "@/lib/associations";
+import { Business, Service, Professional } from "@/lib/associations";
 import BookingClient from "./BookingClient";
 
 export async function generateMetadata({
@@ -25,11 +25,18 @@ export default async function PublicBookingPage({
   });
   if (!business) notFound();
 
-  const services = await Service.findAll({
-    where: { business_id: business.id, active: true },
-    attributes: ["id", "name", "duration_minutes", "price"],
-    order: [["name", "ASC"]],
-  });
+  const [services, professionals] = await Promise.all([
+    Service.findAll({
+      where: { business_id: business.id, active: true },
+      attributes: ["id", "name", "duration_minutes", "price"],
+      order: [["name", "ASC"]],
+    }),
+    Professional.findAll({
+      where: { business_id: business.id },
+      attributes: ["id", "name"],
+      order: [["created_at", "ASC"]],
+    }),
+  ]);
 
   return (
     <BookingClient
@@ -42,6 +49,7 @@ export default async function PublicBookingPage({
         durationMinutes: s.duration_minutes,
         price: s.price,
       }))}
+      professionals={professionals.map((p) => ({ id: p.id, name: p.name || "Sin nombre" }))}
     />
   );
 }

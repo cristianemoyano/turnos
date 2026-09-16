@@ -28,7 +28,13 @@ type Business = {
 
 type Professional = { id: string; name: string; phone: string | null };
 
-type Block = { id: string; start_at: string; duration_minutes: number; reason: string | null };
+type Block = {
+  id: string;
+  start_at: string;
+  duration_minutes: number;
+  reason: string | null;
+  professional?: { id: string; name: string } | null;
+};
 
 const WEEKDAYS: Weekday[] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const DAY_LABELS: Record<Weekday, string> = {
@@ -54,7 +60,7 @@ function shiftRangeLabel(shifts: Shift[]): string {
   return shifts.map((s) => `${s.from} a ${s.to}`).join(", ");
 }
 
-export default function MasClient() {
+export default function ConfiguracionClient() {
   const [business, setBusiness] = useState<Business | null>(null);
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [hours, setHours] = useState<DayRow[]>([]);
@@ -104,7 +110,7 @@ export default function MasClient() {
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <div className="flex-none px-5 pt-4.5 pb-3 border-b-2 border-divider">
-        <h2 className="text-2xl">Más</h2>
+        <h2 className="text-2xl">Configuración</h2>
       </div>
       <div className="flex-1 overflow-auto pb-16 flex flex-col gap-3 p-4">
         <Card elevated>
@@ -175,7 +181,7 @@ export default function MasClient() {
               return (
                 <div key={b.id} className="flex items-center justify-between gap-2 text-sm">
                   <span className="opacity-80">
-                    {capitalized} {formatTimeInTz(start, tz)}-{formatTimeInTz(end, tz)}
+                    {capitalized} {formatTimeInTz(start, tz)}-{formatTimeInTz(end, tz)} · {b.professional?.name ?? "Todos"}
                     {b.reason && ` · ${b.reason}`}
                   </span>
                   <button
@@ -226,7 +232,12 @@ export default function MasClient() {
         onOpenChange={setEditScheduleOpen}
         onSaved={() => setRefresh((r) => r + 1)}
       />
-      <NewBlockSheet open={newBlockOpen} onOpenChange={setNewBlockOpen} onCreated={() => setRefresh((r) => r + 1)} />
+      <NewBlockSheet
+        open={newBlockOpen}
+        onOpenChange={setNewBlockOpen}
+        onCreated={() => setRefresh((r) => r + 1)}
+        professionals={professionals}
+      />
     </div>
   );
 }

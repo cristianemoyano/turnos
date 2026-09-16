@@ -1,5 +1,5 @@
 import { Op } from "sequelize";
-import { Appointment, BusinessHours } from "@/lib/associations";
+import { Appointment, BusinessHours, Professional } from "@/lib/associations";
 import type { Weekday } from "@/modules/business/business-hours.model";
 import { timeStringToMinutes, minutesToTimeString } from "@/lib/format";
 
@@ -68,19 +68,31 @@ export interface BusyRange {
   end: number;
 }
 
-async function getBusyRanges(businessId: string, dateStr: string, timeZone: string): Promise<BusyRange[]> {
+/**
+ * Busy ranges for a given professional, in the "affected professionals"
+ * model: a row with `professional_id: null` affects the whole business (e.g.
+ * a "Todos" block, or any row from a single-professional business where no
+ * professional is ever selected), so it always counts. A row scoped to a
+ * specific professional only counts when asking about that same professional.
+ * Pass `professionalId: null` to get only the business-wide rows.
+ */
+async function getBusyRangesForProfessional(
+  businessId: string,
+  dateStr: string,
+  timeZone: string,
+  professionalId: string | null,
+): Promise<BusyRange[]> {
   const dayStart = zonedTimeToUtc(dateStr, "00:00", timeZone);
   const dayEnd = zonedTimeToUtc(dateStr, "23:59", timeZone);
 
-  // Simplification (MVP): conflicts are checked business-wide, not per
-  // professional/chair. There is no per-professional capacity concept yet,
-  // so any non-cancelled appointment or block anywhere in the business
-  // occupies that time slot for everyone.
   const busy = await Appointment.findAll({
     where: {
       business_id: businessId,
       status: { [Op.ne]: "cancelled" },
       start_at: { [Op.between]: [dayStart, dayEnd] },
+      [Op.or]: professionalId
+        ? [{ professional_id: null }, { professional_id: professionalId }]
+        : [{ professional_id: null }],
     },
   });
 
@@ -99,40 +111,82 @@ function overlaps(aStart: number, aEnd: number, ranges: BusyRange[]): boolean {
  * BusinessHours shifts minus existing bookings. `after` (a UTC instant) can
  * be passed to drop slots that already started (used to hide past times when
  * the requested date is today).
+ *
+ * `professionalId`: pass a specific professional to get *their* free times
+ * (accounting for business-wide blocks too). Omit it to get slots free for
+ * *at least one* professional — used before the client has picked who — which
+ * degrades to the plain business-wide calendar when there are 0 or 1
+ * professionals.
+ *
+ * `durationMinutes`: how long the appointment being scheduled actually is —
+ * a slot only counts as free if the *entire* duration fits without
+ * conflicting, not just the first step. Defaults to the slot grid step
+ * (used when the caller doesn't know the service yet, e.g. before it's
+ * picked in the staff flow — correctness is still enforced by `hasConflict`
+ * at creation time either way).
  */
 export async function computeAvailability(
   businessId: string,
   dateStr: string,
   timeZone: string,
   after?: Date,
+  professionalId?: string,
+  durationMinutes: number = SLOT_STEP_MINUTES,
 ): Promise<string[]> {
   const weekday = weekdayForDate(dateStr);
   const hours = await BusinessHours.findOne({ where: { business_id: businessId, day_of_week: weekday } });
   if (!hours || !hours.is_open || !hours.shifts?.length) return [];
 
-  const busyRanges = await getBusyRanges(businessId, dateStr, timeZone);
-  const afterMs = after?.getTime() ?? -Infinity;
+  let isBlocked: (start: number, end: number) => boolean;
+  if (professionalId) {
+    const busyRanges = await getBusyRangesForProfessional(businessId, dateStr, timeZone, professionalId);
+    isBlocked = (start, end) => overlaps(start, end, busyRanges);
+  } else {
+    const professionals = await Professional.findAll({ where: { business_id: businessId }, attributes: ["id"] });
+    if (professionals.length <= 1) {
+      const busyRanges = await getBusyRangesForProfessional(businessId, dateStr, timeZone, null);
+      isBlocked = (start, end) => overlaps(start, end, busyRanges);
+    } else {
+      const perProfessionalRanges = await Promise.all(
+        professionals.map((p) => getBusyRangesForProfessional(businessId, dateStr, timeZone, p.id)),
+      );
+      // A slot only truly has no availability if every professional is busy then.
+      isBlocked = (start, end) => perProfessionalRanges.every((ranges) => overlaps(start, end, ranges));
+    }
+  }
 
+  const afterMs = after?.getTime() ?? -Infinity;
   const slots: string[] = [];
   for (const shift of hours.shifts) {
     const shiftStartMin = timeStringToMinutes(shift.from);
     const shiftEndMin = timeStringToMinutes(shift.to);
-    for (let m = shiftStartMin; m + SLOT_STEP_MINUTES <= shiftEndMin; m += SLOT_STEP_MINUTES) {
+    for (let m = shiftStartMin; m + durationMinutes <= shiftEndMin; m += SLOT_STEP_MINUTES) {
       const timeStr = minutesToTimeString(m);
       const slotStart = zonedTimeToUtc(dateStr, timeStr, timeZone).getTime();
-      const slotEnd = slotStart + SLOT_STEP_MINUTES * 60_000;
+      const slotEnd = slotStart + durationMinutes * 60_000;
       if (slotStart < afterMs) continue;
-      if (overlaps(slotStart, slotEnd, busyRanges)) continue;
+      if (isBlocked(slotStart, slotEnd)) continue;
       slots.push(timeStr);
     }
   }
   return slots;
 }
 
-/** True if a candidate [startAt, startAt+durationMinutes) range overlaps any
- * existing non-cancelled appointment/block in the business (see the
- * business-wide simplification note on `computeAvailability`). */
-export async function hasConflict(businessId: string, startAt: Date, durationMinutes: number): Promise<boolean> {
+/**
+ * True if a candidate [startAt, startAt+durationMinutes) range overlaps any
+ * existing non-cancelled row that affects `professionalId`. A `null`
+ * `professionalId` means the candidate itself is business-wide (a "Todos"
+ * block, or any booking in a single-professional business) — that always
+ * conflicts with any existing row regardless of professional, since it
+ * would occupy everyone's time. A specific `professionalId` only conflicts
+ * with that professional's own rows plus any business-wide row.
+ */
+export async function hasConflict(
+  businessId: string,
+  startAt: Date,
+  durationMinutes: number,
+  professionalId: string | null = null,
+): Promise<boolean> {
   const start = startAt.getTime();
   const end = start + durationMinutes * 60_000;
   const pad = 24 * 60 * 60_000;
@@ -142,6 +196,7 @@ export async function hasConflict(businessId: string, startAt: Date, durationMin
       business_id: businessId,
       status: { [Op.ne]: "cancelled" },
       start_at: { [Op.between]: [new Date(start - pad), new Date(end + pad)] },
+      ...(professionalId ? { [Op.or]: [{ professional_id: null }, { professional_id: professionalId }] } : {}),
     },
   });
 

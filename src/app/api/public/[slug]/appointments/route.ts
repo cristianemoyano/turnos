@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { Op } from "sequelize";
 import { z } from "zod";
 import sequelize from "@/lib/db";
-import { Business, Service, Client, Appointment } from "@/lib/associations";
+import { Business, Service, Client, Appointment, Professional } from "@/lib/associations";
 
 const bodySchema = z.object({
   serviceId: z.string().uuid(),
+  professionalId: z.string().uuid().optional(),
   startAt: z.string().datetime({ offset: true }).or(z.string().datetime()),
   name: z.string().trim().min(2).max(200),
   phone: z.string().trim().min(6).max(30),
@@ -34,7 +35,7 @@ export async function POST(
       { status: 422 },
     );
   }
-  const { serviceId, startAt, name, phone } = parsed.data;
+  const { serviceId, professionalId, startAt, name, phone } = parsed.data;
 
   const business = await Business.findOne({ where: { slug }, attributes: ["id", "timezone"] });
   if (!business) {
@@ -48,6 +49,15 @@ export async function POST(
     return NextResponse.json({ error: "Servicio no encontrado", code: "SERVICE_NOT_FOUND" }, { status: 404 });
   }
 
+  let resolvedProfessionalId: string | null = null;
+  if (professionalId) {
+    const professional = await Professional.findOne({ where: { id: professionalId, business_id: business.id } });
+    if (!professional) {
+      return NextResponse.json({ error: "Profesional no encontrado", code: "PROFESSIONAL_NOT_FOUND" }, { status: 404 });
+    }
+    resolvedProfessionalId = professional.id;
+  }
+
   const start = new Date(startAt);
   const end = new Date(start.getTime() + service.duration_minutes * 60_000);
 
@@ -58,6 +68,13 @@ export async function POST(
           business_id: business.id,
           status: { [Op.ne]: "cancelled" },
           start_at: { [Op.lt]: end },
+          // A specific professional is only occupied by their own bookings
+          // plus anything business-wide (professional_id null); booking with
+          // no professional chosen is itself business-wide and must not
+          // collide with anyone.
+          ...(resolvedProfessionalId
+            ? { [Op.or]: [{ professional_id: null }, { professional_id: resolvedProfessionalId }] }
+            : {}),
         },
         transaction: t,
         lock: t.LOCK.UPDATE,
@@ -83,7 +100,7 @@ export async function POST(
       return Appointment.create(
         {
           business_id: business.id,
-          professional_id: null,
+          professional_id: resolvedProfessionalId,
           client_id: client.id,
           service_id: service.id,
           kind: "appointment",

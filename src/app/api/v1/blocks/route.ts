@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireBusiness } from "@/lib/api-auth";
-import { Appointment, Business } from "@/lib/associations";
+import { Appointment, Business, Professional } from "@/lib/associations";
 import { timeStringToMinutes } from "@/lib/format";
 import { zonedTimeToUtc } from "@/lib/tz";
 import sequelize from "@/lib/db";
@@ -15,6 +15,7 @@ const createSchema = z
     to_date: z.string().regex(DATE_RE),
     from_time: z.string().min(1),
     to_time: z.string().min(1),
+    professional_id: z.string().uuid().optional().nullable(),
     reason: z.string().trim().max(300).optional().nullable(),
   })
   .refine((v) => v.to_date >= v.from_date, { message: "La fecha de fin debe ser posterior a la de inicio", path: ["to_date"] })
@@ -36,6 +37,7 @@ export async function GET() {
 
   const blocks = await Appointment.findAll({
     where: { business_id: ctx.businessId, kind: "block" },
+    include: [{ model: Professional, as: "professional" }],
     order: [["start_at", "ASC"]],
     limit: 100,
   });
@@ -58,7 +60,13 @@ export async function POST(req: Request) {
   const business = await Business.findByPk(ctx.businessId);
   if (!business) return NextResponse.json({ error: "Negocio no encontrado", code: "NOT_FOUND" }, { status: 404 });
 
-  const { from_date, to_date, from_time, to_time, reason } = parsed.data;
+  const { from_date, to_date, from_time, to_time, professional_id, reason } = parsed.data;
+  if (professional_id) {
+    const professional = await Professional.findOne({ where: { id: professional_id, business_id: ctx.businessId } });
+    if (!professional) {
+      return NextResponse.json({ error: "Profesional no encontrado", code: "PROFESSIONAL_NOT_FOUND" }, { status: 404 });
+    }
+  }
   const durationMinutes = timeStringToMinutes(to_time) - timeStringToMinutes(from_time);
 
   const dateKeys: string[] = [];
@@ -80,7 +88,7 @@ export async function POST(req: Request) {
         Appointment.create(
           {
             business_id: ctx.businessId,
-            professional_id: null,
+            professional_id: professional_id ?? null,
             client_id: null,
             service_id: null,
             kind: "block",

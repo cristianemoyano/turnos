@@ -40,7 +40,11 @@ export default function AgendaClient({ timezone, todayKey }: { timezone: string;
     fetch(`/api/v1/appointments?date=${selectedDate}`)
       .then((r) => r.json())
       .then((json) => setAppointments(json.data ?? []));
-    fetch(`/api/v1/agenda/availability?date=${selectedDate}`)
+    const availabilityUrl =
+      professionalFilter === "all"
+        ? `/api/v1/agenda/availability?date=${selectedDate}`
+        : `/api/v1/agenda/availability?date=${selectedDate}&professionalId=${professionalFilter}`;
+    fetch(availabilityUrl)
       .then((r) => r.json())
       .then((json) => {
         setFreeTimes(json.data?.times ?? []);
@@ -49,14 +53,19 @@ export default function AgendaClient({ timezone, todayKey }: { timezone: string;
     fetch(`/api/v1/agenda/week-summary?start=${selectedDate}`)
       .then((r) => r.json())
       .then((json) => setIsOpen(json.data?.[0]?.isOpen ?? true));
-  }, [selectedDate]);
+  }, [selectedDate, professionalFilter]);
 
   useEffect(() => {
     if (view === "day") refresh();
   }, [view, refresh]);
 
+  // Business-wide rows (professional_id null — a "Todos" block, or any row
+  // from a single-professional business) always show regardless of filter,
+  // since they affect every professional including whichever one is selected.
   const filteredAppointments =
-    professionalFilter === "all" ? appointments : appointments.filter((a) => a.professional_id === professionalFilter);
+    professionalFilter === "all"
+      ? appointments
+      : appointments.filter((a) => a.professional_id === null || a.professional_id === professionalFilter);
 
   const confirmedCount = appointments.filter((a) => a.kind === "appointment" && a.status !== "cancelled").length;
   const cancelledCount = appointments.filter((a) => a.kind === "appointment" && a.status === "cancelled").length;

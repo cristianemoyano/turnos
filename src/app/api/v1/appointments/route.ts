@@ -85,7 +85,7 @@ export async function POST(req: Request) {
 
   if (input.kind === "block") {
     const durationMinutes = input.duration_minutes ?? 30;
-    if (await hasConflict(ctx.businessId, startAt, durationMinutes)) {
+    if (await hasConflict(ctx.businessId, startAt, durationMinutes, input.professional_id ?? null)) {
       return NextResponse.json({ error: "Ese horario ya está ocupado", code: "SLOT_TAKEN" }, { status: 409 });
     }
     const block = await Appointment.create({
@@ -123,7 +123,7 @@ export async function POST(req: Request) {
     ? segments.reduce((sum, s) => sum + s.duration_minutes, 0)
     : service.duration_minutes;
 
-  if (await hasConflict(ctx.businessId, startAt, totalDuration)) {
+  if (await hasConflict(ctx.businessId, startAt, totalDuration, input.professional_id ?? null)) {
     return NextResponse.json({ error: "Ese horario ya está ocupado", code: "SLOT_TAKEN" }, { status: 409 });
   }
 

@@ -15,6 +15,11 @@ interface ServiceDTO {
   price: string;
 }
 
+interface ProfessionalDTO {
+  id: string;
+  name: string;
+}
+
 interface DayOption {
   ymd: string;
   label: string;
@@ -42,14 +47,18 @@ export default function BookingClient({
   businessName,
   timezone,
   services,
+  professionals,
 }: {
   slug: string;
   businessName: string;
   timezone: string;
   services: ServiceDTO[];
+  professionals: ProfessionalDTO[];
 }) {
   const [step, setStep] = useState<Step>(1);
   const [selectedService, setSelectedService] = useState<ServiceDTO | null>(null);
+  const needsProfessional = professionals.length > 1;
+  const [selectedProfessionalId, setSelectedProfessionalId] = useState<string | null>(null);
 
   const dayOptions = useMemo(() => buildDayOptions(timezone), [timezone]);
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
@@ -64,15 +73,20 @@ export default function BookingClient({
   const [result, setResult] = useState<{ serviceName: string; dayLabel: string; time: string } | null>(null);
 
   const selectedDay = dayOptions[selectedDayIndex];
-  const slotsKey = selectedService && selectedDay ? `${selectedService.id}:${selectedDay.ymd}` : null;
+  const professionalChosen = !needsProfessional || !!selectedProfessionalId;
+  const slotsKey =
+    selectedService && selectedDay && professionalChosen
+      ? `${selectedService.id}:${selectedDay.ymd}:${selectedProfessionalId ?? "any"}`
+      : null;
   const slotsLoading = step === 2 && slotsKey !== null && slotsByKey?.key !== slotsKey;
   const slots = slotsByKey?.key === slotsKey ? slotsByKey.slots : [];
 
   useEffect(() => {
     if (step !== 2 || !selectedService || !selectedDay || !slotsKey) return;
     let cancelled = false;
+    const professionalParam = selectedProfessionalId ? `&professionalId=${selectedProfessionalId}` : "";
     fetch(
-      `/api/public/${slug}/availability?date=${selectedDay.ymd}&serviceId=${selectedService.id}`,
+      `/api/public/${slug}/availability?date=${selectedDay.ymd}&serviceId=${selectedService.id}${professionalParam}`,
     )
       .then((r) => r.json())
       .then((json: { data?: string[] }) => {
@@ -84,10 +98,11 @@ export default function BookingClient({
     return () => {
       cancelled = true;
     };
-  }, [step, selectedService, selectedDay, slotsKey, slug]);
+  }, [step, selectedService, selectedDay, selectedProfessionalId, slotsKey, slug]);
 
   function selectService(service: ServiceDTO) {
     setSelectedService(service);
+    setSelectedProfessionalId(null);
     setSelectedDayIndex(0);
     setSelectedSlot(null);
     setServerError("");
@@ -116,6 +131,7 @@ export default function BookingClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           serviceId: selectedService.id,
+          professionalId: selectedProfessionalId ?? undefined,
           startAt,
           name: name.trim(),
           phone: phone.trim(),
@@ -139,6 +155,7 @@ export default function BookingClient({
   function resetAll() {
     setStep(1);
     setSelectedService(null);
+    setSelectedProfessionalId(null);
     setSelectedDayIndex(0);
     setSlotsByKey(null);
     setSelectedSlot(null);
@@ -190,39 +207,63 @@ export default function BookingClient({
             </Button>
           </div>
           <h2 className="font-heading font-bold text-sm text-text/70">
-            Elegí día y horario — {selectedService.name}
+            {needsProfessional ? `¿Con quién preferís? — ${selectedService.name}` : `Elegí día y horario — ${selectedService.name}`}
           </h2>
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {dayOptions.map((day, i) => (
-              <Button
-                key={day.ymd}
-                type="button"
-                variant={i === selectedDayIndex ? "primary" : "secondary"}
-                size="sm"
-                onClick={() => selectDay(i)}
-              >
-                {day.label}
-              </Button>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {slotsLoading && <p className="text-sm text-text/60">Buscando horarios…</p>}
-            {!slotsLoading && slots.length === 0 && (
-              <p className="text-sm text-text/60">No hay horarios disponibles para este día.</p>
-            )}
-            {!slotsLoading &&
-              slots.map((slot) => (
+
+          {needsProfessional && (
+            <div className="flex flex-wrap gap-2">
+              {professionals.map((p) => (
                 <Button
-                  key={slot}
+                  key={p.id}
                   type="button"
-                  variant={slot === selectedSlot ? "primary" : "secondary"}
+                  variant={p.id === selectedProfessionalId ? "primary" : "secondary"}
                   size="sm"
-                  onClick={() => selectSlot(slot)}
+                  onClick={() => {
+                    setSelectedProfessionalId(p.id);
+                    setSelectedSlot(null);
+                  }}
                 >
-                  {slot}
+                  {p.name}
                 </Button>
               ))}
-          </div>
+            </div>
+          )}
+
+          {professionalChosen && (
+            <>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {dayOptions.map((day, i) => (
+                  <Button
+                    key={day.ymd}
+                    type="button"
+                    variant={i === selectedDayIndex ? "primary" : "secondary"}
+                    size="sm"
+                    onClick={() => selectDay(i)}
+                  >
+                    {day.label}
+                  </Button>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {slotsLoading && <p className="text-sm text-text/60">Buscando horarios…</p>}
+                {!slotsLoading && slots.length === 0 && (
+                  <p className="text-sm text-text/60">No hay horarios disponibles para este día.</p>
+                )}
+                {!slotsLoading &&
+                  slots.map((slot) => (
+                    <Button
+                      key={slot}
+                      type="button"
+                      variant={slot === selectedSlot ? "primary" : "secondary"}
+                      size="sm"
+                      onClick={() => selectSlot(slot)}
+                    >
+                      {slot}
+                    </Button>
+                  ))}
+              </div>
+            </>
+          )}
         </section>
       )}
 
@@ -236,7 +277,9 @@ export default function BookingClient({
           <h2 className="font-heading font-bold text-sm text-text/70">Tus datos</h2>
           <Card elevated>
             <CardBody>
-              {selectedService.name} · {selectedDay.label} {selectedSlot}
+              {selectedService.name}
+              {selectedProfessionalId && ` · ${professionals.find((p) => p.id === selectedProfessionalId)?.name}`} ·{" "}
+              {selectedDay.label} {selectedSlot}
             </CardBody>
           </Card>
           <div className="flex flex-col gap-3">
