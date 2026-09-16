@@ -168,8 +168,10 @@ export default function MasClient() {
               const tz = business?.timezone ?? "America/Argentina/Buenos_Aires";
               const start = new Date(b.start_at);
               const end = new Date(start.getTime() + b.duration_minutes * 60000);
-              const dayLabel = new Intl.DateTimeFormat("es-AR", { weekday: "long", timeZone: tz }).format(start);
-              const capitalized = dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1);
+              const dateLabel = new Intl.DateTimeFormat("es-AR", { weekday: "short", day: "numeric", month: "short", timeZone: tz }).format(
+                start,
+              );
+              const capitalized = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
               return (
                 <div key={b.id} className="flex items-center justify-between gap-2 text-sm">
                   <span className="opacity-80">

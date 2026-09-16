@@ -4,15 +4,16 @@ import { requireBusiness } from "@/lib/api-auth";
 import { Appointment } from "@/lib/associations";
 
 /**
- * Status transitions use `{ status }` for real appointments ("done" |
- * "cancelled"; "confirmed" is the creation default and not settable here).
- * Removing a block uses `{ action: "unblock" }` instead of DELETE so both
- * mutations share one endpoint/shape family with the rest of the API
- * (PATCH + structured body), and so the client doesn't need a second verb
- * just for this one kind of row.
+ * Status transitions use `{ status }` for real appointments ("confirmed" —
+ * staff manually confirming a pending turno without waiting for the client's
+ * link click — | "done" | "cancelled"; "pending" is the creation state and
+ * not settable here). `{ deposit_paid }` toggles the manual deposit-tracking
+ * flag. Removing a block uses `{ action: "unblock" }` instead of DELETE so
+ * all mutations share one endpoint/shape family (PATCH + structured body).
  */
 const patchSchema = z.union([
-  z.object({ status: z.enum(["done", "cancelled"]) }),
+  z.object({ status: z.enum(["confirmed", "done", "cancelled"]) }),
+  z.object({ deposit_paid: z.boolean() }),
   z.object({ action: z.literal("unblock") }),
 ]);
 
@@ -53,7 +54,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     );
   }
 
-  appointment.status = parsed.data.status;
+  if ("deposit_paid" in parsed.data) {
+    appointment.deposit_paid = parsed.data.deposit_paid;
+  } else {
+    appointment.status = parsed.data.status;
+  }
   await appointment.save();
   return NextResponse.json({ data: appointment });
 }

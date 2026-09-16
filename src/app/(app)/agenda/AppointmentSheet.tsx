@@ -54,7 +54,7 @@ export function AppointmentSheet({
     close();
   }
 
-  async function patchStatus(id: string, status: "done" | "cancelled") {
+  async function patchStatus(id: string, status: "confirmed" | "done" | "cancelled") {
     await fetch(`/api/v1/appointments/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -62,6 +62,15 @@ export function AppointmentSheet({
     });
     onChanged();
     close();
+  }
+
+  async function toggleDepositPaid(id: string, depositPaid: boolean) {
+    await fetch(`/api/v1/appointments/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deposit_paid: depositPaid }),
+    });
+    onChanged();
   }
 
   async function unblock(id: string) {
@@ -122,8 +131,24 @@ export function AppointmentSheet({
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="text-xl">{sheet.appointment.client?.name}</h3>
-            <Badge variant={sheet.appointment.status === "confirmed" ? "accent" : sheet.appointment.status === "done" ? "neutral" : "outline"}>
-              {sheet.appointment.status === "confirmed" ? "Confirmado" : sheet.appointment.status === "done" ? "Atendido" : "Cancelado"}
+            <Badge
+              variant={
+                sheet.appointment.status === "confirmed"
+                  ? "accent"
+                  : sheet.appointment.status === "pending"
+                    ? "accent2"
+                    : sheet.appointment.status === "done"
+                      ? "neutral"
+                      : "outline"
+              }
+            >
+              {sheet.appointment.status === "confirmed"
+                ? "Confirmado"
+                : sheet.appointment.status === "pending"
+                  ? "Pendiente"
+                  : sheet.appointment.status === "done"
+                    ? "Atendido"
+                    : "Cancelado"}
             </Badge>
           </div>
           <p className="text-sm opacity-80 m-0">
@@ -133,6 +158,43 @@ export function AppointmentSheet({
             )}{" "}
             · {sheet.appointment.duration_minutes} min · {money(sheet.appointment.price)}
           </p>
+
+          {sheet.appointment.deposit_required && (
+            <div className="flex items-center justify-between gap-2 text-sm border border-divider p-2.5">
+              <span>Seña requerida: {money(sheet.appointment.deposit_required)}</span>
+              <Button
+                variant={sheet.appointment.deposit_paid ? "secondary" : "primary"}
+                size="sm"
+                onClick={() => toggleDepositPaid(sheet.appointment.id, !sheet.appointment.deposit_paid)}
+              >
+                {sheet.appointment.deposit_paid ? "Marcar como no pagada" : "Marcar como pagada"}
+              </Button>
+            </div>
+          )}
+
+          {sheet.appointment.status === "pending" && (
+            <>
+              <a
+                href={waLink(
+                  sheet.appointment.client?.phone,
+                  `Hola ${sheet.appointment.client?.name}! Confirmá tu turno de ${sheet.appointment.service?.name} acá: ${typeof window !== "undefined" ? window.location.origin : ""}/confirmar/${sheet.appointment.confirmation_token}`,
+                )}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <Button variant="primary" block>
+                  Enviar link de confirmación
+                </Button>
+              </a>
+              <Button variant="secondary" block onClick={() => patchStatus(sheet.appointment.id, "confirmed")}>
+                Marcar como confirmado
+              </Button>
+              <Button variant="ghost" block onClick={() => patchStatus(sheet.appointment.id, "cancelled")}>
+                Cancelar turno
+              </Button>
+            </>
+          )}
+
           {sheet.appointment.status === "confirmed" && (
             <>
               <Button variant="primary" block onClick={() => patchStatus(sheet.appointment.id, "done")}>

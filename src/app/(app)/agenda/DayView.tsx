@@ -6,7 +6,8 @@ import { money, minutesToTimeString } from "@/lib/format";
 import { localMinutesInTz } from "@/lib/tz";
 import type { RawAppointment } from "./types";
 
-const STATUS_BADGE: Record<string, { label: string; variant: "accent" | "neutral" | "outline" }> = {
+const STATUS_BADGE: Record<string, { label: string; variant: "accent" | "accent2" | "neutral" | "outline" }> = {
+  pending: { label: "Pendiente", variant: "accent2" },
   confirmed: { label: "Confirmado", variant: "accent" },
   done: { label: "Atendido", variant: "neutral" },
   cancelled: { label: "Cancelado", variant: "outline" },
@@ -117,6 +118,11 @@ export function DayView({
                 {a.source === "online" && (
                   <Badge variant="outline" className="text-[9px] px-1.5 py-px">
                     Online
+                  </Badge>
+                )}
+                {a.deposit_required && (
+                  <Badge variant={a.deposit_paid ? "accent" : "outline"} className="text-[9px] px-1.5 py-px">
+                    {a.deposit_paid ? "Seña pagada" : "Seña pendiente"}
                   </Badge>
                 )}
               </div>

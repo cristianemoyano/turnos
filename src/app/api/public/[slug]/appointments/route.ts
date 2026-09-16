@@ -92,6 +92,7 @@ export async function POST(
           start_at: start,
           duration_minutes: service.duration_minutes,
           price: service.price,
+          deposit_required: service.deposit_amount,
         },
         { transaction: t },
       );

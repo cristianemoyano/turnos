@@ -145,6 +145,7 @@ export async function POST(req: Request) {
         if (!existing) throw new Error("CLIENT_NOT_FOUND");
       }
 
+      const source = input.source ?? "staff";
       return Appointment.create(
         {
           business_id: ctx.businessId,
@@ -152,11 +153,15 @@ export async function POST(req: Request) {
           client_id: clientId,
           service_id: service.id,
           kind: "appointment",
-          status: "confirmed",
-          source: input.source ?? "staff",
+          // Staff-created bookings start pending — the client themselves must
+          // confirm (via the WhatsApp link) before it counts as guaranteed.
+          // Online self-bookings are already a confirming action by nature.
+          status: source === "online" ? "confirmed" : "pending",
+          source,
           start_at: startAt,
           duration_minutes: totalDuration,
           price: service.price,
+          deposit_required: service.deposit_amount,
           reason: null,
         },
         { transaction: t },

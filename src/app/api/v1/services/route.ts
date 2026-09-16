@@ -7,6 +7,7 @@ const createSchema = z.object({
   name: z.string().trim().min(1).max(200),
   duration_minutes: z.coerce.number().int().positive(),
   price: z.coerce.number().min(0),
+  deposit_amount: z.coerce.number().min(0).optional().nullable(),
 });
 
 export async function GET() {
@@ -40,6 +41,7 @@ export async function POST(req: Request) {
     name: parsed.data.name,
     duration_minutes: parsed.data.duration_minutes,
     price: String(parsed.data.price),
+    deposit_amount: parsed.data.deposit_amount != null ? String(parsed.data.deposit_amount) : null,
     active: true,
   });
   return NextResponse.json({ data: service }, { status: 201 });

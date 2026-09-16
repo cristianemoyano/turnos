@@ -8,13 +8,14 @@ export interface ServiceAttributes extends Timestamps, BusinessScoped {
   name: string;
   duration_minutes: number;
   price: string;
+  deposit_amount: string | null;
   active: boolean;
 }
 
 export type ServiceCreationAttributes = Omit<
   ServiceAttributes,
-  "id" | "created_at" | "updated_at" | "deleted_at" | "active"
-> & { active?: boolean };
+  "id" | "created_at" | "updated_at" | "deleted_at" | "active" | "deposit_amount"
+> & { active?: boolean; deposit_amount?: string | null };
 
 export class Service extends Model<ServiceAttributes, ServiceCreationAttributes> {
   declare id: CreationOptional<UUID>;
@@ -22,6 +23,7 @@ export class Service extends Model<ServiceAttributes, ServiceCreationAttributes>
   declare name: string;
   declare duration_minutes: number;
   declare price: string;
+  declare deposit_amount: string | null;
   declare active: boolean;
   declare created_at: Date;
   declare updated_at: Date;
@@ -34,6 +36,7 @@ Service.init(
     name: { type: DataTypes.STRING(200), allowNull: false },
     duration_minutes: { type: DataTypes.INTEGER, allowNull: false },
     price: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
+    deposit_amount: { type: DataTypes.DECIMAL(10, 2) },
     active: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
     ...businessScopedColumnDefs,
   },

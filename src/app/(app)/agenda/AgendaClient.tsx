@@ -20,6 +20,12 @@ function addDays(dateKey: string, days: number): string {
   return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
 }
 
+function shiftMonth(dateKey: string, months: number): string {
+  const [y, m] = dateKey.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1 + months, 1));
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-01`;
+}
+
 export default function AgendaClient({ timezone, todayKey }: { timezone: string; todayKey: string }) {
   const [view, setView] = useState<ViewMode>("day");
   const [selectedDate, setSelectedDate] = useState(todayKey);
@@ -29,8 +35,6 @@ export default function AgendaClient({ timezone, todayKey }: { timezone: string;
   const [freeTimes, setFreeTimes] = useState<string[]>([]);
   const [isOpen, setIsOpen] = useState(true);
   const [sheet, setSheet] = useState<SheetState>(null);
-
-  const tomorrowKey = addDays(todayKey, 1);
 
   const refresh = useCallback(() => {
     fetch(`/api/v1/appointments?date=${selectedDate}`)
@@ -56,57 +60,106 @@ export default function AgendaClient({ timezone, todayKey }: { timezone: string;
 
   const confirmedCount = appointments.filter((a) => a.kind === "appointment" && a.status !== "cancelled").length;
   const cancelledCount = appointments.filter((a) => a.kind === "appointment" && a.status === "cancelled").length;
+  // Revenue only counts appointments the client has actually confirmed (or
+  // already attended) — a pending booking isn't guaranteed money yet.
   const revenue = appointments
-    .filter((a) => a.kind === "appointment" && a.status !== "cancelled")
+    .filter((a) => a.kind === "appointment" && (a.status === "confirmed" || a.status === "done"))
     .reduce((sum, a) => sum + Number(a.price ?? 0), 0);
+
+  function navigate(delta: 1 | -1) {
+    if (view === "day") setSelectedDate((d) => addDays(d, delta));
+    else if (view === "week") setSelectedDate((d) => addDays(d, delta * 7));
+    else setSelectedDate((d) => shiftMonth(d, delta));
+  }
+
+  const navLabel =
+    view === "day"
+      ? selectedDate === todayKey
+        ? "Hoy"
+        : dateLabelInTz(new Date(selectedDate + "T12:00:00"), timezone)
+      : view === "week"
+        ? `Semana del ${dateLabelInTz(new Date(selectedDate + "T12:00:00"), timezone)}`
+        : new Intl.DateTimeFormat("es-AR", { month: "long", year: "numeric", timeZone: "UTC" }).format(
+            new Date(selectedDate + "T12:00:00Z"),
+          );
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative">
-      {view === "day" && (
-        <div className="flex-none px-5 pt-4 pb-3 border-b-2 border-divider">
-          <div className="flex items-baseline justify-between">
-            <h2 className="text-[22px]">{selectedDate === todayKey ? "Hoy" : dateLabelInTz(new Date(selectedDate + "T12:00:00"), timezone)}</h2>
-            <span className="text-xs opacity-60">{dateLabelInTz(new Date(selectedDate + "T12:00:00"), timezone)}</span>
-          </div>
-          <div className="flex gap-1.5 mt-2.5">
-            <Button variant={view === "day" ? "primary" : "secondary"} size="sm" block onClick={() => setView("day")}>
-              Día
-            </Button>
-            <Button variant="secondary" size="sm" block onClick={() => setView("week")}>
-              Semana
-            </Button>
-            <Button variant="secondary" size="sm" block onClick={() => setView("month")}>
-              Mes
-            </Button>
-          </div>
-          <div className="flex gap-1.5 mt-2.5 flex-wrap">
-            <Badge variant="accent">{confirmedCount} turnos</Badge>
-            <Badge variant="neutral">{money(revenue)}</Badge>
-            {cancelledCount > 0 && <Badge variant="outline">{cancelledCount} cancelado</Badge>}
-          </div>
-          {professionals.length > 1 && (
-            <div className="flex gap-1.5 mt-2 flex-wrap">
-              <button
-                type="button"
-                onClick={() => setProfessionalFilter("all")}
-                className={`text-xs px-2.5 py-1 border cursor-pointer ${professionalFilter === "all" ? "bg-accent text-bg border-accent" : "border-divider"}`}
-              >
-                Todos
-              </button>
-              {professionals.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => setProfessionalFilter(p.id)}
-                  className={`text-xs px-2.5 py-1 border cursor-pointer ${professionalFilter === p.id ? "bg-accent text-bg border-accent" : "border-divider"}`}
-                >
-                  {p.name}
-                </button>
-              ))}
-            </div>
-          )}
+      <div className="flex-none px-5 pt-4 pb-3 border-b-2 border-divider">
+        <div className="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            aria-label="Anterior"
+            onClick={() => navigate(-1)}
+            className="size-8 flex-none flex items-center justify-center border border-divider cursor-pointer"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+          </button>
+          <h2 className="text-base font-heading font-extrabold capitalize truncate">{navLabel}</h2>
+          <button
+            type="button"
+            aria-label="Siguiente"
+            onClick={() => navigate(1)}
+            className="size-8 flex-none flex items-center justify-center border border-divider cursor-pointer"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+          </button>
         </div>
-      )}
+        {selectedDate !== todayKey && (
+          <button
+            type="button"
+            onClick={() => setSelectedDate(todayKey)}
+            className="mt-1.5 text-xs text-accent underline underline-offset-2 cursor-pointer"
+          >
+            Volver a hoy
+          </button>
+        )}
+        <div className="flex gap-1.5 mt-2.5">
+          <Button variant={view === "day" ? "primary" : "secondary"} size="sm" block onClick={() => setView("day")}>
+            Día
+          </Button>
+          <Button variant={view === "week" ? "primary" : "secondary"} size="sm" block onClick={() => setView("week")}>
+            Semana
+          </Button>
+          <Button variant={view === "month" ? "primary" : "secondary"} size="sm" block onClick={() => setView("month")}>
+            Mes
+          </Button>
+        </div>
+        {view === "day" && (
+          <>
+            <div className="flex gap-1.5 mt-2.5 flex-wrap">
+              <Badge variant="accent">{confirmedCount} turnos</Badge>
+              <Badge variant="neutral">{money(revenue)}</Badge>
+              {cancelledCount > 0 && <Badge variant="outline">{cancelledCount} cancelado</Badge>}
+            </div>
+            {professionals.length > 1 && (
+              <div className="flex gap-1.5 mt-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setProfessionalFilter("all")}
+                  className={`text-xs px-2.5 py-1 border cursor-pointer ${professionalFilter === "all" ? "bg-accent text-bg border-accent" : "border-divider"}`}
+                >
+                  Todos
+                </button>
+                {professionals.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setProfessionalFilter(p.id)}
+                    className={`text-xs px-2.5 py-1 border cursor-pointer ${professionalFilter === p.id ? "bg-accent text-bg border-accent" : "border-divider"}`}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       {view === "day" && (
         <DayView
@@ -167,7 +220,7 @@ export default function AgendaClient({ timezone, todayKey }: { timezone: string;
         onClose={() => setSheet(null)}
         onCreated={refresh}
         todayKey={todayKey}
-        tomorrowKey={tomorrowKey}
+        initialDate={selectedDate}
         presetTime={sheet?.type === "new" ? sheet.presetTime : undefined}
         professionals={professionals}
         timezone={timezone}

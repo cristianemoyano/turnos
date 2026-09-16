@@ -8,18 +8,24 @@ import { FormField } from "@/components/primitives/FormField";
 import { Card, CardTitle, CardBody, CardKicker } from "@/components/primitives/Card";
 import { money } from "@/lib/format";
 import { waLink } from "@/lib/whatsapp";
-import { zonedTimeToUtc } from "@/lib/tz";
+import { zonedTimeToUtc, dateLabelInTz } from "@/lib/tz";
 import { cn } from "@/lib/cn";
 import type { Professional, ServiceInfo } from "./types";
 
 type Client = { id: string; name: string; phone: string | null };
+
+function shiftDateKey(dateKey: string, days: number): string {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + days));
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
+}
 
 export function NewAppointmentSheet({
   open,
   onClose,
   onCreated,
   todayKey,
-  tomorrowKey,
+  initialDate,
   presetTime,
   professionals,
   timezone,
@@ -28,13 +34,13 @@ export function NewAppointmentSheet({
   onClose: () => void;
   onCreated: () => void;
   todayKey: string;
-  tomorrowKey: string;
+  initialDate: string;
   presetTime?: string;
   professionals: Professional[];
   timezone: string;
 }) {
   const [step, setStep] = useState(0);
-  const [day, setDay] = useState<"hoy" | "mañana">("hoy");
+  const [date, setDate] = useState(initialDate);
   const [time, setTime] = useState<string | null>(presetTime ?? null);
   const [times, setTimes] = useState<string[]>([]);
   const [services, setServices] = useState<ServiceInfo[]>([]);
@@ -49,7 +55,13 @@ export function NewAppointmentSheet({
   const [serviceId, setServiceId] = useState<string | null>(null);
   const [professionalId, setProfessionalId] = useState<string | null>(null);
 
-  const [successInfo, setSuccessInfo] = useState<{ clientName: string; serviceName: string; time: string } | null>(null);
+  const [successInfo, setSuccessInfo] = useState<{
+    clientName: string;
+    serviceName: string;
+    time: string;
+    date: string;
+    confirmationToken: string;
+  } | null>(null);
 
   // Reset the wizard's form state on the open transition, using React's
   // "adjust state during render" pattern (not an effect) since this only
@@ -60,7 +72,7 @@ export function NewAppointmentSheet({
     setWasOpen(open);
     if (open) {
       setStep(presetTime ? 1 : 0);
-      setDay("hoy");
+      setDate(initialDate);
       setTime(presetTime ?? null);
       setMode("existing");
       setClientQuery("");
@@ -75,14 +87,18 @@ export function NewAppointmentSheet({
 
   useEffect(() => {
     if (!open) return;
-    const date = day === "hoy" ? todayKey : tomorrowKey;
+    let ignore = false;
     fetch(`/api/v1/agenda/availability?date=${date}`)
       .then((r) => r.json())
       .then((json) => {
+        if (ignore) return;
         setTimes(json.data.times);
         setServices(json.data.services);
       });
-  }, [open, day, todayKey, tomorrowKey]);
+    return () => {
+      ignore = true;
+    };
+  }, [open, date]);
 
   useEffect(() => {
     if (mode !== "existing" || !open) return;
@@ -97,10 +113,10 @@ export function NewAppointmentSheet({
 
   const selectedService = services.find((s) => s.id === serviceId) ?? null;
   const selectedClient = clientResults.find((c) => c.id === clientId) ?? null;
+  const dateLabel = dateLabelInTz(new Date(date + "T12:00:00"), timezone);
 
   async function confirm() {
     if (!time || !selectedService) return;
-    const date = day === "hoy" ? todayKey : tomorrowKey;
     const startAt = zonedTimeToUtc(date, time, timezone);
     const body: Record<string, unknown> = {
       kind: "appointment",
@@ -117,10 +133,13 @@ export function NewAppointmentSheet({
       body: JSON.stringify(body),
     });
     if (!res.ok) return;
+    const json = await res.json();
     setSuccessInfo({
       clientName: mode === "existing" ? (selectedClient?.name ?? "") : newName,
       serviceName: selectedService.name,
       time,
+      date: dateLabel,
+      confirmationToken: json.data?.confirmation_token,
     });
     setStep(4);
     onCreated();
@@ -139,20 +158,37 @@ export function NewAppointmentSheet({
         {step === 0 && (
           <>
             <div className="flex gap-2">
-              <Button variant={day === "hoy" ? "primary" : "secondary"} block onClick={() => setDay("hoy")}>
+              <Button variant={date === todayKey ? "primary" : "secondary"} block onClick={() => { setDate(todayKey); setTime(null); }}>
                 Hoy
               </Button>
-              <Button variant={day === "mañana" ? "primary" : "secondary"} block onClick={() => setDay("mañana")}>
+              <Button
+                variant={date === shiftDateKey(todayKey, 1) ? "primary" : "secondary"}
+                block
+                onClick={() => { setDate(shiftDateKey(todayKey, 1)); setTime(null); }}
+              >
                 Mañana
               </Button>
             </div>
+            <FormField label="O elegí otra fecha">
+              <Input
+                type="date"
+                min={todayKey}
+                value={date}
+                onChange={(e) => {
+                  setDate(e.target.value);
+                  setTime(null);
+                }}
+              />
+            </FormField>
             <div className="flex flex-wrap gap-2">
               {times.map((t) => (
                 <Button key={t} variant={time === t ? "primary" : "secondary"} onClick={() => setTime(t)}>
                   {t}
                 </Button>
               ))}
-              {times.length === 0 && <p className="text-sm opacity-55 m-0">No hay horarios disponibles.</p>}
+              {times.length === 0 && (
+                <p className="text-sm opacity-55 m-0">Sin turnos disponibles este día — elegí otra fecha.</p>
+              )}
             </div>
             <Button variant="primary" block disabled={!time} onClick={() => setStep(1)}>
               Continuar
@@ -225,6 +261,7 @@ export function NewAppointmentSheet({
                     <CardTitle>{s.name}</CardTitle>
                     <CardBody>
                       {s.duration_minutes} min · {money(s.price)}
+                      {s.deposit_amount && ` · Seña ${money(s.deposit_amount)}`}
                     </CardBody>
                   </div>
                 </Card>
@@ -262,19 +299,23 @@ export function NewAppointmentSheet({
           <>
             <Card elevated>
               <CardKicker>
-                {day === "hoy" ? "Hoy" : "Mañana"} · {time}
+                {dateLabel} · {time}
               </CardKicker>
               <CardTitle>{mode === "existing" ? selectedClient?.name : newName}</CardTitle>
               <CardBody>
                 {selectedService.name} · {selectedService.duration_minutes} min · {money(selectedService.price)}
+                {selectedService.deposit_amount && ` · Seña requerida: ${money(selectedService.deposit_amount)}`}
               </CardBody>
             </Card>
+            <p className="text-xs opacity-60 m-0">
+              El turno queda pendiente hasta que el cliente lo confirme por el link que le vas a enviar por WhatsApp.
+            </p>
             <div className="flex gap-2">
               <Button variant="secondary" onClick={() => setStep(2)}>
                 Atrás
               </Button>
               <Button variant="primary" block onClick={confirm}>
-                Confirmar turno
+                Crear turno
               </Button>
             </div>
           </>
@@ -288,18 +329,21 @@ export function NewAppointmentSheet({
                   <path d="M20 6 9 17l-5-5" />
                 </svg>
               </div>
-              <h3 className="text-xl">Turno creado</h3>
+              <h3 className="text-xl">Turno pendiente de confirmación</h3>
               <p className="m-0 text-center text-sm opacity-70">
-                {successInfo.clientName} · {successInfo.time} · {successInfo.serviceName}
+                {successInfo.clientName} · {successInfo.date} {successInfo.time} · {successInfo.serviceName}
               </p>
             </div>
             <a
-              href={waLink(null, `Hola ${successInfo.clientName}! Te agendé un turno para ${successInfo.serviceName} a las ${successInfo.time}.`)}
+              href={waLink(
+                null,
+                `Hola ${successInfo.clientName}! Te agendé un turno para ${successInfo.serviceName} el ${successInfo.date} a las ${successInfo.time}. Confirmalo acá para dejarlo reservado: ${typeof window !== "undefined" ? window.location.origin : ""}/confirmar/${successInfo.confirmationToken}`,
+              )}
               target="_blank"
               rel="noreferrer"
             >
               <Button variant="primary" block>
-                Enviar confirmación por WhatsApp
+                Enviar por WhatsApp para confirmar
               </Button>
             </a>
             <Button variant="secondary" block onClick={onClose}>

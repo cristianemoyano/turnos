@@ -3,45 +3,30 @@ import { z } from "zod";
 import { requireBusiness } from "@/lib/api-auth";
 import { Appointment, Business } from "@/lib/associations";
 import { timeStringToMinutes } from "@/lib/format";
+import { zonedTimeToUtc } from "@/lib/tz";
+import sequelize from "@/lib/db";
 
-const DAY_LABELS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_RANGE_DAYS = 60;
 
-const createSchema = z.object({
-  day: z.enum(DAY_LABELS as [string, ...string[]]),
-  from: z.string().min(1),
-  to: z.string().min(1),
-  reason: z.string().trim().max(300).optional().nullable(),
-});
+const createSchema = z
+  .object({
+    from_date: z.string().regex(DATE_RE),
+    to_date: z.string().regex(DATE_RE),
+    from_time: z.string().min(1),
+    to_time: z.string().min(1),
+    reason: z.string().trim().max(300).optional().nullable(),
+  })
+  .refine((v) => v.to_date >= v.from_date, { message: "La fecha de fin debe ser posterior a la de inicio", path: ["to_date"] })
+  .refine((v) => timeStringToMinutes(v.to_time) > timeStringToMinutes(v.from_time), {
+    message: "El horario de fin debe ser posterior al de inicio",
+    path: ["to_time"],
+  });
 
-/**
- * The prototype models a block as "next Friday 15:00–17:00", not a specific
- * date — we honor that simplified UX by resolving it to the next upcoming
- * occurrence of that weekday, in the business's timezone.
- */
-function nextOccurrence(dayLabel: string, timeStr: string, timeZone: string): Date {
-  const targetDow = DAY_LABELS.indexOf(dayLabel);
-  const [hh, mm] = timeStr.split(":").map((n) => parseInt(n, 10) || 0);
-
-  const now = new Date();
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    weekday: "short",
-  }).formatToParts(now);
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
-  const year = Number(get("year"));
-  const month = Number(get("month"));
-  const day = Number(get("day"));
-  const weekdayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-  const todayDow = weekdayMap[get("weekday")] ?? 0;
-
-  let deltaDays = targetDow - todayDow;
-  if (deltaDays < 0) deltaDays += 7;
-
-  const base = new Date(Date.UTC(year, month - 1, day + deltaDays, hh, mm));
-  return base;
+function addDaysToDateKey(dateKey: string, days: number): string {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + days));
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
 }
 
 export async function GET() {
@@ -73,23 +58,44 @@ export async function POST(req: Request) {
   const business = await Business.findByPk(ctx.businessId);
   if (!business) return NextResponse.json({ error: "Negocio no encontrado", code: "NOT_FOUND" }, { status: 404 });
 
-  const { day, from, to, reason } = parsed.data;
-  const startAt = nextOccurrence(day, from, business.timezone);
-  const durationMinutes = Math.max(timeStringToMinutes(to) - timeStringToMinutes(from), 15);
+  const { from_date, to_date, from_time, to_time, reason } = parsed.data;
+  const durationMinutes = timeStringToMinutes(to_time) - timeStringToMinutes(from_time);
 
-  const block = await Appointment.create({
-    business_id: ctx.businessId,
-    professional_id: null,
-    client_id: null,
-    service_id: null,
-    kind: "block",
-    status: "confirmed",
-    source: "staff",
-    start_at: startAt,
-    duration_minutes: durationMinutes,
-    price: null,
-    reason: reason || "Bloqueado",
-  });
+  const dateKeys: string[] = [];
+  let cursor = from_date;
+  while (cursor <= to_date) {
+    dateKeys.push(cursor);
+    if (dateKeys.length > MAX_RANGE_DAYS) {
+      return NextResponse.json(
+        { error: `El rango no puede superar ${MAX_RANGE_DAYS} días`, code: "RANGE_TOO_LONG" },
+        { status: 422 },
+      );
+    }
+    cursor = addDaysToDateKey(cursor, 1);
+  }
 
-  return NextResponse.json({ data: block }, { status: 201 });
+  const blocks = await sequelize.transaction((t) =>
+    Promise.all(
+      dateKeys.map((dateKey) =>
+        Appointment.create(
+          {
+            business_id: ctx.businessId,
+            professional_id: null,
+            client_id: null,
+            service_id: null,
+            kind: "block",
+            status: "confirmed",
+            source: "staff",
+            start_at: zonedTimeToUtc(dateKey, from_time, business.timezone),
+            duration_minutes: durationMinutes,
+            price: null,
+            reason: reason || "Bloqueado",
+          },
+          { transaction: t },
+        ),
+      ),
+    ),
+  );
+
+  return NextResponse.json({ data: blocks }, { status: 201 });
 }
