@@ -1,0 +1,47 @@
+import { notFound } from "next/navigation";
+import type { Metadata } from "next";
+import { Business, Service } from "@/lib/associations";
+import BookingClient from "./BookingClient";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const business = await Business.findOne({ where: { slug }, attributes: ["name"] });
+  return { title: business ? `Reservar turno — ${business.name}` : "Reservar turno" };
+}
+
+export default async function PublicBookingPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const business = await Business.findOne({
+    where: { slug },
+    attributes: ["id", "name", "slug", "timezone"],
+  });
+  if (!business) notFound();
+
+  const services = await Service.findAll({
+    where: { business_id: business.id, active: true },
+    attributes: ["id", "name", "duration_minutes", "price"],
+    order: [["name", "ASC"]],
+  });
+
+  return (
+    <BookingClient
+      slug={business.slug}
+      businessName={business.name}
+      timezone={business.timezone}
+      services={services.map((s) => ({
+        id: s.id,
+        name: s.name,
+        durationMinutes: s.duration_minutes,
+        price: s.price,
+      }))}
+    />
+  );
+}

@@ -12,14 +12,16 @@ export interface BusinessAttributes extends Timestamps {
   slug: string;
   timezone: string;
   trial_ends_at: Date | null;
+  onboarding_completed_at: Date | null;
 }
 
 export type BusinessCreationAttributes = Omit<
   BusinessAttributes,
-  "id" | "created_at" | "updated_at" | "deleted_at" | "timezone" | "trial_ends_at"
+  "id" | "created_at" | "updated_at" | "deleted_at" | "timezone" | "trial_ends_at" | "onboarding_completed_at"
 > & {
   timezone?: string;
   trial_ends_at?: Date | null;
+  onboarding_completed_at?: Date | null;
 };
 
 export class Business extends Model<BusinessAttributes, BusinessCreationAttributes> {
@@ -30,6 +32,7 @@ export class Business extends Model<BusinessAttributes, BusinessCreationAttribut
   declare slug: string;
   declare timezone: string;
   declare trial_ends_at: Date | null;
+  declare onboarding_completed_at: Date | null;
   declare created_at: Date;
   declare updated_at: Date;
   declare deleted_at: Date | null;
@@ -44,6 +47,7 @@ Business.init(
     slug: { type: DataTypes.STRING(80), allowNull: false, unique: true },
     timezone: { type: DataTypes.STRING(60), allowNull: false, defaultValue: "America/Argentina/Buenos_Aires" },
     trial_ends_at: { type: DataTypes.DATE },
+    onboarding_completed_at: { type: DataTypes.DATE },
     ...auditColumnDefs,
   },
   { sequelize, tableName: "businesses", modelName: "Business", paranoid: true, underscored: true },
