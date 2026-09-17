@@ -8,6 +8,7 @@ import { segmentsFromService, weekdayForDate } from "@/modules/agenda/availabili
 import { whyDoesNotFit } from "@/modules/agenda/slot-fit";
 import { formatTimeInTz } from "@/lib/format";
 import { dateKeyInTz, isStartInPast } from "@/lib/tz";
+import { isCapServerConfigured, verifyCapToken } from "@/lib/cap-verify";
 
 const bodySchema = z.object({
   serviceId: z.string().uuid(),
@@ -15,6 +16,7 @@ const bodySchema = z.object({
   startAt: z.string().datetime({ offset: true }).or(z.string().datetime()),
   name: z.string().trim().min(2).max(200),
   phone: z.string().trim().min(6).max(30),
+  capToken: z.string().optional(),
 });
 
 function dayLabelFor(startAt: Date, timezone: string): string {
@@ -40,7 +42,14 @@ export async function POST(
       { status: 422 },
     );
   }
-  const { serviceId, professionalId, startAt, name, phone } = parsed.data;
+  const { serviceId, professionalId, startAt, name, phone, capToken } = parsed.data;
+
+  if (isCapServerConfigured()) {
+    const capOk = await verifyCapToken(capToken ?? "");
+    if (!capOk) {
+      return NextResponse.json({ error: "Verificación fallida", code: "CAP_FAILED" }, { status: 403 });
+    }
+  }
 
   const business = await Business.findOne({ where: { slug }, attributes: ["id", "timezone"] });
   if (!business) {

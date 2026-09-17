@@ -1,0 +1,116 @@
+# Production Docker Swarm stack for Turnos.
+# Deploy via: make prod-deploy TAG=vX.Y.Z
+# Shares the Andiko nginx edge via external network andiko_web.
+
+x-logging: &default-logging
+  driver: local
+  options:
+    max-size: "50m"
+    max-file: "5"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - source: turnos_postgres_password
+        target: postgres_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - internal
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  app:
+    image: ${GHCR_IMAGE}:${IMAGE_TAG}
+    environment:
+      NODE_ENV: production
+      AUTH_TRUST_HOST: "true"
+      NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-https://turnos.andiko.cloud}
+      NEXT_PUBLIC_CAP_HOST: ${NEXT_PUBLIC_CAP_HOST:-https://cap.andiko.cloud}
+      NEXT_PUBLIC_CAP_SITE_KEY: ${NEXT_PUBLIC_CAP_SITE_KEY:-}
+      CAP_VERIFY_URL: ${CAP_VERIFY_URL:-https://cap.andiko.cloud/siteverify}
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+    secrets:
+      - source: turnos_database_url
+        target: database_url
+      - source: turnos_auth_secret
+        target: auth_secret
+      - source: turnos_auth_url
+        target: auth_url
+      - source: turnos_cap_secret
+        target: cap_secret
+    networks:
+      - web
+      - internal
+    deploy:
+      replicas: 1
+      update_config:
+        order: start-first
+        failure_action: rollback
+      rollback_config:
+        order: stop-first
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 1536M
+        reservations:
+          cpus: "0.25"
+          memory: 512M
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 8s
+      retries: 6
+      start_period: 30s
+
+networks:
+  web:
+    external: true
+    name: andiko_web
+  internal:
+    driver: overlay
+    attachable: true
+
+volumes:
+  postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${POSTGRES_DATA_DIR}
+
+secrets:
+  turnos_postgres_password:
+    external: true
+  turnos_database_url:
+    external: true
+  turnos_auth_secret:
+    external: true
+  turnos_auth_url:
+    external: true
+  turnos_cap_secret:
+    external: true

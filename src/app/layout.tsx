@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   description: "Agenda y reservas online para peluquerías y barberías",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es" className={`${archivo.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">

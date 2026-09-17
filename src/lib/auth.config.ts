@@ -15,7 +15,8 @@ export const authConfig: NextAuthConfig = {
         pathname.startsWith("/confirmar/") ||
         pathname.startsWith("/api/auth") ||
         pathname.startsWith("/api/public") ||
-        pathname.startsWith("/api/v1/signup");
+        pathname.startsWith("/api/v1/signup") ||
+        pathname.startsWith("/api/health");
       return isPublic || !!auth?.user;
     },
   },
