@@ -22,7 +22,7 @@ Turnos is a multi-tenant appointment booking product (salons / studios). Stack: 
 - Business logic lives in `src/modules/*/…service.ts`, never in routes or models.
 - Routes are thin: validate → service → response.
 - Models define structure and associations only.
-- Auth edge config: `src/lib/auth.config.ts` + `src/middleware.ts`. Node auth: `src/lib/auth.ts`.
+- Auth edge config: `src/lib/auth.config.ts` + `src/proxy.ts`. Node auth: `src/lib/auth.ts`.
 
 ## Production
 
