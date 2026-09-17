@@ -24,6 +24,14 @@ Turnos is a multi-tenant appointment booking product (salons / studios). Stack: 
 - Models define structure and associations only.
 - Auth edge config: `src/lib/auth.config.ts` + `src/proxy.ts`. Node auth: `src/lib/auth.ts`.
 
+### Notifications & live agenda (Andiko-aligned)
+
+- **Agenda SSE** (`/api/v1/agenda/stream`): in-process hub (`agenda-events.hub`) publishes on appointment/block mutations; open agenda UIs refresh without polling. Single Node process only.
+- **In-app + push**: `src/modules/notifications` with `business_id` tenancy. Event keys: `agenda.appointment_created|confirmed|cancelled|rescheduled`. Fan-out via `emitInAppNotification` after commit (never throws into the business txn).
+- **Notifications SSE** (`/api/v1/notifications/stream`): unread snapshot signature poll (same pattern as Andiko).
+- **VAPID**: `platform_settings` singleton (encrypted private key via `AUTH_SECRET`) or env bootstrap `PUSH_VAPID_PUBLIC_KEY` / `PUSH_VAPID_PRIVATE_KEY` / `PUSH_VAPID_CONTACT_EMAIL` / `PUSH_VAPID_ENABLED`.
+- Email channel and Cap-on-booking follow-ups are out of scope for this stack.
+
 ## Production
 
 | Item | Value |

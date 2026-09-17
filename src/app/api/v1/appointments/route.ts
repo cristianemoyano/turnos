@@ -6,7 +6,12 @@ import { requireBusiness } from "@/lib/api-auth";
 import { Appointment, Business, Client, Professional, Service, ServiceSegment } from "@/lib/associations";
 import { zonedTimeToUtc, hasConflict, segmentsFromService } from "@/modules/agenda/availability.service";
 import { wallClockMinutes } from "@/modules/agenda/segments";
-import { isStartInPast } from "@/lib/tz";
+import {
+  notifyAppointmentEvent,
+  publishBlockChange,
+} from "@/modules/agenda/agenda-notifications.service";
+import { publishAgendaEvent } from "@/modules/agenda/agenda-events.hub";
+import { dateKeyInTz, isStartInPast } from "@/lib/tz";
 import { optionalPhoneSchema } from "@/lib/phone";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -106,6 +111,12 @@ export async function POST(req: Request) {
       price: null,
       reason: input.reason,
     });
+    const business = await Business.findByPk(ctx.businessId, { attributes: ["timezone"] });
+    publishBlockChange(ctx.businessId, {
+      appointmentId: block.id,
+      startAt,
+      timezone: business?.timezone || "America/Argentina/Buenos_Aires",
+    });
     return NextResponse.json({ data: block }, { status: 201 });
   }
 
@@ -197,5 +208,32 @@ export async function POST(req: Request) {
   }
 
   const full = await Appointment.findByPk(created.id, { include: includeForDetail });
+  const business = await Business.findByPk(ctx.businessId, { attributes: ["timezone"] });
+  const timezone = business?.timezone || "America/Argentina/Buenos_Aires";
+  const client = full?.get("client") as Client | null | undefined;
+  const svc = full?.get("service") as Service | null | undefined;
+  const pro = full?.get("professional") as Professional | null | undefined;
+  // Forgotten past visits (`done`) are logging, not actionable inbox noise.
+  if (created.status !== "done") {
+    void notifyAppointmentEvent({
+      businessId: ctx.businessId,
+      actorId: ctx.userId,
+      appointmentId: created.id,
+      clientName: client?.name ?? "Cliente",
+      serviceName: svc?.name ?? "Servicio",
+      professionalName: pro?.name ?? null,
+      startAt: created.start_at,
+      timezone,
+      source: created.source === "online" ? "online" : "staff",
+      eventKey: "agenda.appointment_created",
+      liveType: "appointment.created",
+    });
+  } else {
+    publishAgendaEvent(ctx.businessId, {
+      type: "appointment.created",
+      appointmentId: created.id,
+      dateKeys: [dateKeyInTz(created.start_at, timezone)],
+    });
+  }
   return NextResponse.json({ data: full }, { status: 201 });
 }

@@ -1,9 +1,17 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireBusiness } from "@/lib/api-auth";
-import { Appointment, Client, Service, ServiceSegment, Professional } from "@/lib/associations";
+import { Appointment, Business, Client, Service, ServiceSegment, Professional } from "@/lib/associations";
 import { hasConflict, segmentsFromService } from "@/modules/agenda/availability.service";
-import { isStartInPast } from "@/lib/tz";
+import { dateKeyInTz, isStartInPast } from "@/lib/tz";
+import {
+  notifyAppointmentEvent,
+  publishAppointmentRemoved,
+  publishBlockChange,
+} from "@/modules/agenda/agenda-notifications.service";
+import { publishAgendaEvent } from "@/modules/agenda/agenda-events.hub";
+import type { NotificationEventKey } from "@/modules/notifications/notification.schema";
+import type { AgendaLiveEventType } from "@/modules/agenda/agenda-events.hub";
 
 const includeForDetail = [
   // paranoid: false keeps soft-deleted clients visible in agenda history
@@ -67,8 +75,17 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         { status: 400 },
       );
     }
+    const business = await Business.findByPk(ctx.businessId, { attributes: ["timezone"] });
+    const timezone = business?.timezone || "America/Argentina/Buenos_Aires";
+    const startAt = appointment.start_at;
+    const removedId = appointment.id;
     await appointment.destroy();
-    return NextResponse.json({ data: { id: appointment.id, removed: true } });
+    publishAppointmentRemoved(ctx.businessId, {
+      appointmentId: removedId,
+      startAt,
+      timezone,
+    });
+    return NextResponse.json({ data: { id: removedId, removed: true } });
   }
 
   if ("action" in parsed.data && parsed.data.action === "edit-block") {
@@ -102,6 +119,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     appointment.reason = parsed.data.reason;
     appointment.professional_id = nextProfessionalId;
     await appointment.save();
+    const business = await Business.findByPk(ctx.businessId, { attributes: ["timezone"] });
+    publishBlockChange(ctx.businessId, {
+      appointmentId: appointment.id,
+      startAt,
+      timezone: business?.timezone || "America/Argentina/Buenos_Aires",
+    });
     const full = await Appointment.findByPk(appointment.id, { include: includeForDetail });
     return NextResponse.json({ data: full });
   }
@@ -166,5 +189,63 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   await appointment.save();
 
   const full = await Appointment.findByPk(appointment.id, { include: includeForDetail });
+  const business = await Business.findByPk(ctx.businessId, { attributes: ["timezone"] });
+  const timezone = business?.timezone || "America/Argentina/Buenos_Aires";
+  const client = full?.get("client") as Client | null | undefined;
+  const svc = full?.get("service") as Service | null | undefined;
+  const pro = full?.get("professional") as Professional | null | undefined;
+
+  if ("deposit_paid" in parsed.data) {
+    publishAgendaEvent(ctx.businessId, {
+      type: "appointment.updated",
+      appointmentId: appointment.id,
+      dateKeys: [dateKeyInTz(appointment.start_at, timezone)],
+    });
+  } else if ("start_at" in parsed.data) {
+    void notifyAppointmentEvent({
+      businessId: ctx.businessId,
+      actorId: ctx.userId,
+      appointmentId: appointment.id,
+      clientName: client?.name ?? "Cliente",
+      serviceName: svc?.name ?? "Servicio",
+      professionalName: pro?.name ?? null,
+      startAt: appointment.start_at,
+      timezone,
+      source: appointment.source === "online" ? "online" : "staff",
+      eventKey: "agenda.appointment_rescheduled",
+      liveType: "appointment.updated",
+    });
+  } else {
+    const status = parsed.data.status;
+    let eventKey: NotificationEventKey | null = null;
+    let liveType: AgendaLiveEventType = "appointment.updated";
+    if (status === "confirmed") eventKey = "agenda.appointment_confirmed";
+    else if (status === "cancelled") {
+      eventKey = "agenda.appointment_cancelled";
+      liveType = "appointment.cancelled";
+    } else if (status === "done") {
+      publishAgendaEvent(ctx.businessId, {
+        type: "appointment.updated",
+        appointmentId: appointment.id,
+        dateKeys: [dateKeyInTz(appointment.start_at, timezone)],
+      });
+    }
+    if (eventKey) {
+      void notifyAppointmentEvent({
+        businessId: ctx.businessId,
+        actorId: ctx.userId,
+        appointmentId: appointment.id,
+        clientName: client?.name ?? "Cliente",
+        serviceName: svc?.name ?? "Servicio",
+        professionalName: pro?.name ?? null,
+        startAt: appointment.start_at,
+        timezone,
+        source: appointment.source === "online" ? "online" : "staff",
+        eventKey,
+        liveType,
+      });
+    }
+  }
+
   return NextResponse.json({ data: full });
 }

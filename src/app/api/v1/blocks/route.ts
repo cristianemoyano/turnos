@@ -5,6 +5,7 @@ import { Appointment, Business, Professional } from "@/lib/associations";
 import { timeStringToMinutes } from "@/lib/format";
 import { zonedTimeToUtc } from "@/lib/tz";
 import sequelize from "@/lib/db";
+import { publishAgendaEvent } from "@/modules/agenda/agenda-events.hub";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_RANGE_DAYS = 60;
@@ -104,6 +105,11 @@ export async function POST(req: Request) {
       ),
     ),
   );
+
+  publishAgendaEvent(ctx.businessId, {
+    type: "block.changed",
+    dateKeys,
+  });
 
   return NextResponse.json({ data: blocks }, { status: 201 });
 }

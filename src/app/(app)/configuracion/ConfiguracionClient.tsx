@@ -12,6 +12,8 @@ import { EditBusinessSheet } from "./EditBusinessSheet";
 import { EditScheduleSheet } from "./EditScheduleSheet";
 import { NewBlockSheet } from "./NewBlockSheet";
 import { ProfessionalsSection } from "./ProfessionalsSection";
+import { PushSubscriptionCard } from "@/components/layout/PushSubscriptionCard";
+import { PushVapidSettingsCard } from "@/components/layout/PushVapidSettingsCard";
 
 type Weekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
 type Shift = { from: string; to: string };
@@ -185,6 +187,16 @@ export default function ConfiguracionClient() {
         </Card>
 
         <ProfessionalsSection professionals={professionals} onRefresh={() => setRefresh((r) => r + 1)} />
+
+        <Card>
+          <CardKicker>Notificaciones</CardKicker>
+          <CardTitle>Avisos del equipo</CardTitle>
+          <CardBody>Activá push en este dispositivo y configurá las claves VAPID del servidor.</CardBody>
+          <div className="mt-3 flex flex-col gap-2">
+            <PushSubscriptionCard />
+            <PushVapidSettingsCard />
+          </div>
+        </Card>
 
         <Card>
           <div className="flex items-center justify-between">

@@ -6,6 +6,7 @@ import Service from "@/modules/catalog/service.model";
 import ServiceSegment from "@/modules/catalog/service-segment.model";
 import Client from "@/modules/clients/client.model";
 import Appointment from "@/modules/agenda/appointment.model";
+import "@/modules/notifications/notification-associations";
 
 Business.hasMany(User, { foreignKey: "business_id", as: "users" });
 User.belongsTo(Business, { foreignKey: "business_id", as: "business" });

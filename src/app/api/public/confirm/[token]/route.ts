@@ -3,6 +3,7 @@ import { z } from "zod";
 import { Appointment, Client, Service, Business } from "@/lib/associations";
 import { dateLabelInTz } from "@/lib/tz";
 import { isCapServerConfigured, verifyCapToken } from "@/lib/cap-verify";
+import { notifyAppointmentEvent } from "@/modules/agenda/agenda-notifications.service";
 
 const confirmBodySchema = z.object({
   capToken: z.string().optional(),
@@ -70,6 +71,24 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   if (appointment.status === "pending") {
     appointment.status = "confirmed";
     await appointment.save();
+    const businessRow = await Business.findByPk(appointment.business_id, {
+      attributes: ["timezone"],
+    });
+    const client = appointment.get("client") as Client | null | undefined;
+    const service = appointment.get("service") as Service | null | undefined;
+    void notifyAppointmentEvent({
+      businessId: appointment.business_id,
+      actorId: null,
+      appointmentId: appointment.id,
+      clientName: client?.name ?? "Cliente",
+      serviceName: service?.name ?? "Servicio",
+      professionalName: null,
+      startAt: appointment.start_at,
+      timezone: businessRow?.timezone || "America/Argentina/Buenos_Aires",
+      source: appointment.source === "online" ? "online" : "staff",
+      eventKey: "agenda.appointment_confirmed",
+      liveType: "appointment.updated",
+    });
   }
   return NextResponse.json({ data: { status: appointment.status } });
 }

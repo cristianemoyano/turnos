@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Fab } from "@/components/layout/Fab";
+import { NotificationBell } from "@/components/layout/NotificationBell";
 import { Badge } from "@/components/primitives/Badge";
 import { Button } from "@/components/primitives/Button";
 import { Select } from "@/components/primitives/Select";
@@ -15,6 +16,10 @@ import { NewAppointmentSheet } from "./NewAppointmentSheet";
 import type { DayShift, Professional, RawAppointment, SheetState } from "./types";
 
 const PROFESSIONAL_STORAGE_KEY = "turnos.agenda.professionalId";
+const AGENDA_SSE_FAIL_THRESHOLD = 3;
+const AGENDA_SSE_HEALTHY_AFTER_MS = 30_000;
+const AGENDA_SSE_RETRY_BASE_MS = 2_000;
+const AGENDA_SSE_RETRY_MAX_MS = 30_000;
 
 type ViewMode = "day" | "week" | "month";
 
@@ -46,6 +51,8 @@ export default function AgendaClient({ timezone, todayKey }: { timezone: string;
   const [showCancelled, setShowCancelled] = useState(false);
   const [isOpen, setIsOpen] = useState(true);
   const [sheet, setSheet] = useState<SheetState>(null);
+  const [sseRetry, setSseRetry] = useState(0);
+  const sseFailStreakRef = useRef(0);
 
   useEffect(() => {
     fetch("/api/v1/business-hours")
@@ -74,6 +81,60 @@ export default function AgendaClient({ timezone, todayKey }: { timezone: string;
   useEffect(() => {
     if (view === "day") refresh();
   }, [view, refresh]);
+
+  // Live agenda SSE — refresh when another tab/user changes appointments.
+  useEffect(() => {
+    if (typeof EventSource === "undefined") return;
+
+    const es = new EventSource("/api/v1/agenda/stream");
+    const openedAt = Date.now();
+    let closedByCleanup = false;
+    let retryTimer: number | undefined;
+
+    const noteFailure = () => {
+      if (closedByCleanup) return;
+      if (Date.now() - openedAt >= AGENDA_SSE_HEALTHY_AFTER_MS) {
+        sseFailStreakRef.current = 0;
+      } else {
+        sseFailStreakRef.current += 1;
+      }
+      if (sseFailStreakRef.current >= AGENDA_SSE_FAIL_THRESHOLD) return;
+      const delay = Math.min(
+        AGENDA_SSE_RETRY_BASE_MS * 2 ** sseFailStreakRef.current,
+        AGENDA_SSE_RETRY_MAX_MS,
+      );
+      retryTimer = window.setTimeout(() => setSseRetry((r) => r + 1), delay);
+    };
+
+    es.addEventListener("agenda", (ev) => {
+      if (closedByCleanup) return;
+      try {
+        const data = JSON.parse((ev as MessageEvent).data) as {
+          type?: string;
+          dateKeys?: string[];
+        };
+        if (data.type === "connected") return;
+        if (data.dateKeys && data.dateKeys.length > 0 && !data.dateKeys.includes(selectedDate)) {
+          return;
+        }
+        refresh();
+      } catch {
+        noteFailure();
+      }
+    });
+
+    es.onerror = () => {
+      if (closedByCleanup) return;
+      es.close();
+      noteFailure();
+    };
+
+    return () => {
+      closedByCleanup = true;
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
+      es.close();
+    };
+  }, [refresh, selectedDate, sseRetry]);
 
   // Multi-pro day view is always one person at a time — a combined "Todos"
   // grid duplicates the same clock times across stylists and is unreadable.
@@ -154,7 +215,10 @@ export default function AgendaClient({ timezone, todayKey }: { timezone: string;
               <path d="M15 18l-6-6 6-6" />
             </svg>
           </button>
-          <h2 className="text-base font-heading font-extrabold capitalize truncate">{navLabel}</h2>
+          <div className="flex min-w-0 flex-1 items-center justify-center gap-1.5">
+            <h2 className="text-base font-heading font-extrabold capitalize truncate">{navLabel}</h2>
+            <NotificationBell />
+          </div>
           <button
             type="button"
             aria-label="Siguiente"

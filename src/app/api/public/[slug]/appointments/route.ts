@@ -10,6 +10,7 @@ import { formatTimeInTz } from "@/lib/format";
 import { dateKeyInTz, isStartInPast } from "@/lib/tz";
 import { isCapServerConfigured, verifyCapToken } from "@/lib/cap-verify";
 import { requiredPhoneSchema } from "@/lib/phone";
+import { notifyAppointmentEvent } from "@/modules/agenda/agenda-notifications.service";
 
 const bodySchema = z.object({
   serviceId: z.string().uuid(),
@@ -175,6 +176,20 @@ export async function POST(
         },
         { transaction: t },
       );
+    });
+
+    void notifyAppointmentEvent({
+      businessId: business.id,
+      actorId: null,
+      appointmentId: appointment.id,
+      clientName: name,
+      serviceName: service.name,
+      professionalName: resolvedProfessionalName,
+      startAt: appointment.start_at,
+      timezone: business.timezone,
+      source: "online",
+      eventKey: "agenda.appointment_created",
+      liveType: "appointment.created",
     });
 
     return NextResponse.json(
