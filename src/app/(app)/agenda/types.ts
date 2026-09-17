@@ -36,6 +36,10 @@ export type ServiceInfo = {
 };
 export type DayHours = { dayOfWeek: string; isOpen: boolean; shifts: { from: string; to: string }[] };
 export type DayShift = { from: string; to: string };
+export type AgendaBusinessInfo = {
+  address: string | null;
+  bankDetails: string | null;
+};
 export type BookingData = {
   professionals: Professional[];
   services: ServiceInfo[];

@@ -9,11 +9,12 @@ import { Checkbox } from "@/components/primitives/Checkbox";
 import { Card, CardTitle, CardBody, CardKicker } from "@/components/primitives/Card";
 import { money } from "@/lib/format";
 import { waLink } from "@/lib/whatsapp";
+import { buildAppointmentWhatsAppMessage } from "@/lib/appointment-whatsapp";
 import { zonedTimeToUtc, dateLabelInTz } from "@/lib/tz";
 import { cn } from "@/lib/cn";
 import { isStaffOvertimeFit, whyDoesNotFit } from "@/modules/agenda/slot-fit";
 import { emptyDayMessage, wantedSlotMessage, type WantedSlotInfo } from "./availabilityCopy";
-import type { DayShift, Professional, ServiceInfo } from "./types";
+import type { AgendaBusinessInfo, DayShift, Professional, ServiceInfo } from "./types";
 
 type Client = { id: string; name: string; phone: string | null };
 type StepKey = "service" | "professional" | "time" | "client" | "confirm";
@@ -47,6 +48,7 @@ export function NewAppointmentSheet({
   timezone,
   presetProfessionalId,
   hoursRows,
+  businessInfo,
   presetOvertime = false,
   forgottenVisit = false,
 }: {
@@ -60,6 +62,7 @@ export function NewAppointmentSheet({
   timezone: string;
   presetProfessionalId?: string | null;
   hoursRows: { day_of_week: string; is_open: boolean; shifts: DayShift[] }[];
+  businessInfo: AgendaBusinessInfo;
   presetOvertime?: boolean;
   forgottenVisit?: boolean;
 }) {
@@ -101,10 +104,14 @@ export function NewAppointmentSheet({
 
   const [successInfo, setSuccessInfo] = useState<{
     clientName: string;
+    clientPhone: string | null;
     serviceName: string;
+    professionalName: string | null;
     time: string;
-    date: string;
+    dateLabel: string;
+    startAtIso: string;
     confirmationToken: string;
+    depositRequired: string | null;
     alreadyAttended?: boolean;
   } | null>(null);
 
@@ -248,12 +255,20 @@ export function NewAppointmentSheet({
       return;
     }
     const json = await res.json();
+    const clientName = mode === "existing" ? (selectedClient?.name ?? "") : newName;
+    const clientPhone = mode === "existing" ? (selectedClient?.phone ?? null) : newPhone;
+    const professionalName =
+      professionals.find((p) => p.id === professionalId)?.name ?? null;
     setSuccessInfo({
-      clientName: mode === "existing" ? (selectedClient?.name ?? "") : newName,
+      clientName,
+      clientPhone,
       serviceName: selectedService.name,
+      professionalName,
       time,
-      date: dateLabel,
+      dateLabel,
+      startAtIso: startAt.toISOString(),
       confirmationToken: json.data?.confirmation_token,
+      depositRequired: selectedService.deposit_amount,
       alreadyAttended: forgottenVisit,
     });
     onCreated();
@@ -525,14 +540,27 @@ export function NewAppointmentSheet({
                 {successInfo.alreadyAttended ? "Visita registrada" : "Turno pendiente de confirmación"}
               </h3>
               <p className="m-0 text-center text-sm opacity-70">
-                {successInfo.clientName} · {successInfo.date} {successInfo.time} · {successInfo.serviceName}
+                {successInfo.clientName} · {successInfo.dateLabel} {successInfo.time} · {successInfo.serviceName}
               </p>
             </div>
             {!successInfo.alreadyAttended && (
               <a
                 href={waLink(
-                  null,
-                  `Hola ${successInfo.clientName}! Te agendé un turno para ${successInfo.serviceName} el ${successInfo.date} a las ${successInfo.time}. Confirmalo acá para dejarlo reservado: ${typeof window !== "undefined" ? window.location.origin : ""}/confirmar/${successInfo.confirmationToken}`,
+                  successInfo.clientPhone,
+                  buildAppointmentWhatsAppMessage({
+                    kind: "confirm_request",
+                    clientName: successInfo.clientName,
+                    serviceName: successInfo.serviceName,
+                    professionalName: successInfo.professionalName,
+                    startAt: successInfo.startAtIso,
+                    timezone,
+                    address: businessInfo.address,
+                    depositRequired: successInfo.depositRequired,
+                    depositPaid: false,
+                    bankDetails: businessInfo.bankDetails,
+                    confirmationToken: successInfo.confirmationToken,
+                    origin: typeof window !== "undefined" ? window.location.origin : "",
+                  }),
                 )}
                 target="_blank"
                 rel="noreferrer"

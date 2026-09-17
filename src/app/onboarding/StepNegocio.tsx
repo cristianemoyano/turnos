@@ -1,6 +1,6 @@
 "use client";
 
-import { Input } from "@/components/primitives/Input";
+import { Input, Textarea } from "@/components/primitives/Input";
 import { FormField } from "@/components/primitives/FormField";
 import { Button } from "@/components/primitives/Button";
 import { PHONE_HINT, PHONE_PLACEHOLDER } from "@/lib/phone";
@@ -34,6 +34,17 @@ export function StepNegocio({
       </FormField>
       <FormField label="Dirección">
         <Input value={biz.address} onChange={(e) => setBiz({ ...biz, address: e.target.value })} />
+      </FormField>
+      <FormField
+        label="Datos bancarios (seña)"
+        hint="Opcional — alias, CBU o lo que necesiten para transferir la seña"
+      >
+        <Textarea
+          rows={3}
+          placeholder={"Alias: mi.negocio\nCBU: 00000031000…"}
+          value={biz.bankDetails}
+          onChange={(e) => setBiz({ ...biz, bankDetails: e.target.value })}
+        />
       </FormField>
       <FormField label="Link de Google Maps" hint="Opcional — se muestra en la reserva online">
         <Input

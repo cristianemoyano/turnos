@@ -13,7 +13,7 @@ export async function GET(
 
   const services = await Service.findAll({
     where: { business_id: business.id, active: true },
-    attributes: ["id", "name", "duration_minutes", "price"],
+    attributes: ["id", "name", "duration_minutes", "price", "deposit_amount"],
     order: [["name", "ASC"]],
   });
 
@@ -23,6 +23,7 @@ export async function GET(
       name: s.name,
       durationMinutes: s.duration_minutes,
       price: s.price,
+      depositAmount: s.deposit_amount,
     })),
   });
 }

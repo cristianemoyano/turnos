@@ -9,6 +9,7 @@ export interface BusinessAttributes extends Timestamps {
   name: string;
   phone: string | null;
   address: string | null;
+  bank_details: string | null;
   maps_url: string | null;
   instagram_url: string | null;
   facebook_url: string | null;
@@ -28,6 +29,7 @@ export type BusinessCreationAttributes = Omit<
   | "timezone"
   | "trial_ends_at"
   | "onboarding_completed_at"
+  | "bank_details"
   | "maps_url"
   | "instagram_url"
   | "facebook_url"
@@ -36,6 +38,7 @@ export type BusinessCreationAttributes = Omit<
   timezone?: string;
   trial_ends_at?: Date | null;
   onboarding_completed_at?: Date | null;
+  bank_details?: string | null;
   maps_url?: string | null;
   instagram_url?: string | null;
   facebook_url?: string | null;
@@ -47,6 +50,7 @@ export class Business extends Model<BusinessAttributes, BusinessCreationAttribut
   declare name: string;
   declare phone: string | null;
   declare address: string | null;
+  declare bank_details: string | null;
   declare maps_url: string | null;
   declare instagram_url: string | null;
   declare facebook_url: string | null;
@@ -66,6 +70,7 @@ Business.init(
     name: { type: DataTypes.STRING(200), allowNull: false },
     phone: { type: DataTypes.STRING(30) },
     address: { type: DataTypes.STRING(300) },
+    bank_details: { type: DataTypes.TEXT },
     maps_url: { type: DataTypes.STRING(500) },
     instagram_url: { type: DataTypes.STRING(500) },
     facebook_url: { type: DataTypes.STRING(500) },

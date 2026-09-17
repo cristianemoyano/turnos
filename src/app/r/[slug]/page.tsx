@@ -45,6 +45,7 @@ export default async function PublicBookingPage({
       "timezone",
       "maps_url",
       "address",
+      "bank_details",
       "instagram_url",
       "facebook_url",
       "tiktok_url",
@@ -55,7 +56,7 @@ export default async function PublicBookingPage({
   const [services, professionals, hoursRows] = await Promise.all([
     Service.findAll({
       where: { business_id: business.id, active: true },
-      attributes: ["id", "name", "duration_minutes", "price"],
+      attributes: ["id", "name", "duration_minutes", "price", "deposit_amount"],
       order: [["name", "ASC"]],
     }),
     Professional.findAll({
@@ -84,6 +85,7 @@ export default async function PublicBookingPage({
       todayKey={dateKeyInTz(new Date(), business.timezone)}
       mapsUrl={business.maps_url}
       address={business.address}
+      bankDetails={business.bank_details}
       instagramUrl={business.instagram_url}
       facebookUrl={business.facebook_url}
       tiktokUrl={business.tiktok_url}
@@ -93,6 +95,7 @@ export default async function PublicBookingPage({
         name: s.name,
         durationMinutes: s.duration_minutes,
         price: s.price,
+        depositAmount: s.deposit_amount,
       }))}
       professionals={professionals.map((p) => ({ id: p.id, name: p.name || "Sin nombre" }))}
     />

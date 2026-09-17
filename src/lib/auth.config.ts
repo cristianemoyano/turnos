@@ -13,6 +13,7 @@ export const authConfig: NextAuthConfig = {
         pathname.startsWith("/signup") ||
         pathname.startsWith("/r/") ||
         pathname.startsWith("/confirmar/") ||
+        pathname.startsWith("/cancelar/") ||
         pathname.startsWith("/api/auth") ||
         pathname.startsWith("/api/public") ||
         pathname.startsWith("/api/v1/signup") ||

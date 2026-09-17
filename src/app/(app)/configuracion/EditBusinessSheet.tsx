@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Sheet } from "@/components/primitives/Sheet";
 import { Button } from "@/components/primitives/Button";
-import { Input } from "@/components/primitives/Input";
+import { Input, Textarea } from "@/components/primitives/Input";
 import { FormField } from "@/components/primitives/FormField";
 import { PHONE_HINT, PHONE_PLACEHOLDER, isValidShareablePhone } from "@/lib/phone";
 
@@ -11,6 +11,7 @@ type Business = {
   name: string;
   phone: string | null;
   address: string | null;
+  bank_details?: string | null;
   maps_url?: string | null;
   instagram_url?: string | null;
   facebook_url?: string | null;
@@ -35,6 +36,7 @@ export function EditBusinessSheet({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [bankDetails, setBankDetails] = useState("");
   const [mapsUrl, setMapsUrl] = useState("");
   const [instagramUrl, setInstagramUrl] = useState("");
   const [facebookUrl, setFacebookUrl] = useState("");
@@ -52,6 +54,7 @@ export function EditBusinessSheet({
       setName(current.name ?? "");
       setPhone(current.phone ?? "");
       setAddress(current.address ?? "");
+      setBankDetails(current.bank_details ?? "");
       setMapsUrl(current.maps_url ?? "");
       setInstagramUrl(current.instagram_url ?? "");
       setFacebookUrl(current.facebook_url ?? "");
@@ -95,6 +98,7 @@ export function EditBusinessSheet({
           name,
           phone: phone.trim() || null,
           address: address.trim() || null,
+          bankDetails: bankDetails.trim() || null,
           mapsUrl: mapsUrl.trim() || null,
           instagramUrl: instagramUrl.trim() || null,
           facebookUrl: facebookUrl.trim() || null,
@@ -132,6 +136,19 @@ export function EditBusinessSheet({
       </FormField>
       <FormField label="Dirección" htmlFor="eb-address">
         <Input id="eb-address" value={address} onChange={(e) => setAddress(e.target.value)} />
+      </FormField>
+      <FormField
+        label="Datos bancarios (seña)"
+        htmlFor="eb-bank"
+        hint="Alias, CBU o lo que necesiten los clientes para transferir la seña"
+      >
+        <Textarea
+          id="eb-bank"
+          rows={3}
+          placeholder={"Alias: mi.negocio\nCBU: 00000031000…\nBanco Galicia"}
+          value={bankDetails}
+          onChange={(e) => setBankDetails(e.target.value)}
+        />
       </FormField>
       <FormField
         label="Link de Google Maps"

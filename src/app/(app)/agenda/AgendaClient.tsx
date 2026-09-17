@@ -12,7 +12,7 @@ import { WeekView } from "./WeekView";
 import { MonthView } from "./MonthView";
 import { AppointmentSheet } from "./AppointmentSheet";
 import { NewAppointmentSheet } from "./NewAppointmentSheet";
-import type { DayShift, Professional, RawAppointment, SheetState } from "./types";
+import type { DayShift, Professional, RawAppointment, SheetState, AgendaBusinessInfo } from "./types";
 
 const PROFESSIONAL_STORAGE_KEY = "turnos.agenda.professionalId";
 
@@ -35,7 +35,15 @@ function weekdayForDateKey(dateKey: string): string {
   return ["sun", "mon", "tue", "wed", "thu", "fri", "sat"][new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
 }
 
-export default function AgendaClient({ timezone, todayKey }: { timezone: string; todayKey: string }) {
+export default function AgendaClient({
+  timezone,
+  todayKey,
+  businessInfo,
+}: {
+  timezone: string;
+  todayKey: string;
+  businessInfo: AgendaBusinessInfo;
+}) {
   const [view, setView] = useState<ViewMode>("day");
   const [selectedDate, setSelectedDate] = useState(todayKey);
   const [professionalFilter, setProfessionalFilter] = useState<string>("");
@@ -278,6 +286,7 @@ export default function AgendaClient({ timezone, todayKey }: { timezone: string;
         timezone={timezone}
         professionals={professionals}
         selectedProfessionalId={selectedProfessionalId}
+        businessInfo={businessInfo}
       />
       <NewAppointmentSheet
         open={sheet?.type === "new"}
@@ -292,6 +301,7 @@ export default function AgendaClient({ timezone, todayKey }: { timezone: string;
         timezone={timezone}
         presetProfessionalId={selectedProfessionalId}
         hoursRows={hoursRows}
+        businessInfo={businessInfo}
       />
     </div>
   );
