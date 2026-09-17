@@ -57,7 +57,10 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex-none flex border-t-2 border-divider bg-bg">
+    <nav
+      aria-label="Navegación principal"
+      className="sticky bottom-0 z-40 flex shrink-0 border-t-2 border-divider bg-bg pb-[env(safe-area-inset-bottom,0px)]"
+    >
       {TABS.map((tab) => {
         const active = pathname.startsWith(tab.href);
         return (
@@ -65,7 +68,7 @@ export function BottomNav() {
             key={tab.href}
             href={tab.href}
             className={cn(
-              "flex-1 flex flex-col items-center gap-0.5 pt-2.5 pb-3.5",
+              "flex flex-1 flex-col items-center gap-0.5 pt-2.5 pb-3.5",
               active ? "text-accent" : "text-text",
             )}
           >
