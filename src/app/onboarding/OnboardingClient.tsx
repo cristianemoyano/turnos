@@ -47,6 +47,9 @@ export default function OnboardingClient({
         phone: biz.phone,
         address: biz.address,
         mapsUrl: biz.mapsUrl || null,
+        instagramUrl: biz.instagramUrl || null,
+        facebookUrl: biz.facebookUrl || null,
+        tiktokUrl: biz.tiktokUrl || null,
       }),
     });
 

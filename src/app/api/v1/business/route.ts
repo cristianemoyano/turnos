@@ -3,36 +3,21 @@ import { z } from "zod";
 import { requireBusiness } from "@/lib/api-auth";
 import { Business } from "@/lib/associations";
 import { optionalPhoneSchema } from "@/lib/phone";
+import { optionalHttpUrlSchema } from "@/lib/optional-http-url";
 
-const mapsUrlSchema = z
-  .union([z.string(), z.null()])
-  .optional()
-  .superRefine((v, ctx) => {
-    if (v === undefined || v === null) return;
-    const trimmed = v.trim();
-    if (!trimmed) return;
-    if (trimmed.length > 500) {
-      ctx.addIssue({ code: z.ZodIssueCode.too_big, maximum: 500, type: "string", inclusive: true, origin: "string" });
-      return;
-    }
-    if (!/^https?:\/\//i.test(trimmed)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Pegá el link completo de Google Maps (https://...)",
-      });
-    }
-  })
-  .transform((v) => {
-    if (v === undefined) return undefined;
-    if (v === null || !v.trim()) return null;
-    return v.trim();
-  });
+const mapsUrlSchema = optionalHttpUrlSchema("Pegá el link completo de Google Maps (https://...)");
+const instagramUrlSchema = optionalHttpUrlSchema("Pegá el link completo de Instagram (https://...)");
+const facebookUrlSchema = optionalHttpUrlSchema("Pegá el link completo de Facebook (https://...)");
+const tiktokUrlSchema = optionalHttpUrlSchema("Pegá el link completo de TikTok (https://...)");
 
 const updateSchema = z.object({
   name: z.string().trim().min(2).max(200).optional(),
   phone: optionalPhoneSchema,
   address: z.string().trim().max(300).nullable().optional(),
   mapsUrl: mapsUrlSchema,
+  instagramUrl: instagramUrlSchema,
+  facebookUrl: facebookUrlSchema,
+  tiktokUrl: tiktokUrlSchema,
 });
 
 export async function GET() {
@@ -60,11 +45,14 @@ export async function PATCH(req: Request) {
   const business = await Business.findByPk(ctx.businessId);
   if (!business) return NextResponse.json({ error: "Negocio no encontrado", code: "NOT_FOUND" }, { status: 404 });
 
-  const { name, phone, address, mapsUrl } = parsed.data;
+  const { name, phone, address, mapsUrl, instagramUrl, facebookUrl, tiktokUrl } = parsed.data;
   if (name !== undefined) business.name = name;
   if (phone !== undefined) business.phone = phone;
   if (address !== undefined) business.address = address;
   if (mapsUrl !== undefined) business.maps_url = mapsUrl;
+  if (instagramUrl !== undefined) business.instagram_url = instagramUrl;
+  if (facebookUrl !== undefined) business.facebook_url = facebookUrl;
+  if (tiktokUrl !== undefined) business.tiktok_url = tiktokUrl;
   await business.save();
 
   return NextResponse.json({ data: business });

@@ -43,6 +43,9 @@ export default async function OnboardingPage() {
         phone: business.phone ?? "",
         address: business.address ?? "",
         mapsUrl: business.maps_url ?? "",
+        instagramUrl: business.instagram_url ?? "",
+        facebookUrl: business.facebook_url ?? "",
+        tiktokUrl: business.tiktok_url ?? "",
       }}
       initialProfessionals={professionals.map((p) => ({ id: p.id, name: p.name, phone: p.phone ?? "" }))}
       initialHours={hours}

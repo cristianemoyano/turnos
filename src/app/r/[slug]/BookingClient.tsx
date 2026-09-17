@@ -56,6 +56,10 @@ export default function BookingClient({
   todayKey,
   mapsUrl,
   address,
+  instagramUrl,
+  facebookUrl,
+  tiktokUrl,
+  businessHours,
   services,
   professionals,
 }: {
@@ -65,6 +69,10 @@ export default function BookingClient({
   todayKey: string;
   mapsUrl: string | null;
   address: string | null;
+  instagramUrl: string | null;
+  facebookUrl: string | null;
+  tiktokUrl: string | null;
+  businessHours: { dayLabel: string; range: string }[];
   services: ServiceDTO[];
   professionals: ProfessionalDTO[];
 }) {
@@ -247,6 +255,9 @@ export default function BookingClient({
     ? professionals.find((p) => p.id === selectedProfessionalId)?.name
     : null;
 
+  const hasSocial = !!(instagramUrl || facebookUrl || tiktokUrl);
+  const hasHours = businessHours.length > 0;
+
   return (
     <div className="flex flex-col gap-5 p-4 flex-1">
       <header className="flex flex-col gap-1 pb-3 border-b border-divider">
@@ -254,15 +265,52 @@ export default function BookingClient({
         <h1 className="font-heading font-extrabold text-xl leading-tight">{businessName}</h1>
         <p className="text-xs text-text/60">Sin necesidad de crear una cuenta</p>
         {(address || mapsUrl) && (
-          <p className="text-xs text-text/70 mt-1">
+          <p className="text-sm text-text/80 mt-1.5 leading-snug">
             {address ? <span>{address}</span> : null}
             {address && mapsUrl ? " · " : null}
             {mapsUrl ? (
-              <a href={mapsUrl} target="_blank" rel="noreferrer" className="text-accent">
+              <a href={mapsUrl} target="_blank" rel="noreferrer" className="text-accent font-medium">
                 Cómo llegar
               </a>
             ) : null}
           </p>
+        )}
+        {hasHours && (
+          <div className="mt-2.5 flex flex-col gap-0.5">
+            <span className="text-[10px] tracking-[0.08em] uppercase text-text/50">Horarios de atención</span>
+            <ul className="m-0 p-0 list-none text-sm text-text/75">
+              {businessHours.map((h) => (
+                <li key={h.dayLabel} className="flex justify-between gap-3">
+                  <span>{h.dayLabel}</span>
+                  <span className="text-right">{h.range}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {hasSocial && (
+          <div className="mt-2.5 flex flex-col gap-1">
+            <span className="text-[10px] tracking-[0.08em] uppercase text-text/50">Redes sociales</span>
+            <p className="text-sm m-0">
+              {instagramUrl ? (
+                <a href={instagramUrl} target="_blank" rel="noreferrer" className="text-accent">
+                  Instagram
+                </a>
+              ) : null}
+              {instagramUrl && facebookUrl ? " · " : null}
+              {facebookUrl ? (
+                <a href={facebookUrl} target="_blank" rel="noreferrer" className="text-accent">
+                  Facebook
+                </a>
+              ) : null}
+              {(instagramUrl || facebookUrl) && tiktokUrl ? " · " : null}
+              {tiktokUrl ? (
+                <a href={tiktokUrl} target="_blank" rel="noreferrer" className="text-accent">
+                  TikTok
+                </a>
+              ) : null}
+            </p>
+          </div>
         )}
       </header>
 

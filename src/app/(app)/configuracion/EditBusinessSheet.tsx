@@ -12,7 +12,14 @@ type Business = {
   phone: string | null;
   address: string | null;
   maps_url?: string | null;
+  instagram_url?: string | null;
+  facebook_url?: string | null;
+  tiktok_url?: string | null;
 };
+
+function looksLikeHttpUrl(value: string): boolean {
+  return !value.trim() || /^https?:\/\//i.test(value.trim());
+}
 
 export function EditBusinessSheet({
   business,
@@ -29,6 +36,9 @@ export function EditBusinessSheet({
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [mapsUrl, setMapsUrl] = useState("");
+  const [instagramUrl, setInstagramUrl] = useState("");
+  const [facebookUrl, setFacebookUrl] = useState("");
+  const [tiktokUrl, setTiktokUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -43,6 +53,9 @@ export function EditBusinessSheet({
       setPhone(current.phone ?? "");
       setAddress(current.address ?? "");
       setMapsUrl(current.maps_url ?? "");
+      setInstagramUrl(current.instagram_url ?? "");
+      setFacebookUrl(current.facebook_url ?? "");
+      setTiktokUrl(current.tiktok_url ?? "");
       setError("");
     }
     sync();
@@ -56,8 +69,20 @@ export function EditBusinessSheet({
       setError("Revisá el teléfono: necesitamos un número compartible por WhatsApp.");
       return;
     }
-    if (mapsUrl.trim() && !/^https?:\/\//i.test(mapsUrl.trim())) {
+    if (!looksLikeHttpUrl(mapsUrl)) {
       setError("Pegá el link completo de Google Maps (https://…).");
+      return;
+    }
+    if (!looksLikeHttpUrl(instagramUrl)) {
+      setError("Pegá el link completo de Instagram (https://…).");
+      return;
+    }
+    if (!looksLikeHttpUrl(facebookUrl)) {
+      setError("Pegá el link completo de Facebook (https://…).");
+      return;
+    }
+    if (!looksLikeHttpUrl(tiktokUrl)) {
+      setError("Pegá el link completo de TikTok (https://…).");
       return;
     }
     setSaving(true);
@@ -71,6 +96,9 @@ export function EditBusinessSheet({
           phone: phone.trim() || null,
           address: address.trim() || null,
           mapsUrl: mapsUrl.trim() || null,
+          instagramUrl: instagramUrl.trim() || null,
+          facebookUrl: facebookUrl.trim() || null,
+          tiktokUrl: tiktokUrl.trim() || null,
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -117,6 +145,36 @@ export function EditBusinessSheet({
           placeholder="https://maps.google.com/…"
           value={mapsUrl}
           onChange={(e) => setMapsUrl(e.target.value)}
+        />
+      </FormField>
+      <FormField label="Instagram" htmlFor="eb-ig" hint="Opcional — se muestra en la reserva online">
+        <Input
+          id="eb-ig"
+          type="url"
+          inputMode="url"
+          placeholder="https://instagram.com/…"
+          value={instagramUrl}
+          onChange={(e) => setInstagramUrl(e.target.value)}
+        />
+      </FormField>
+      <FormField label="Facebook" htmlFor="eb-fb">
+        <Input
+          id="eb-fb"
+          type="url"
+          inputMode="url"
+          placeholder="https://facebook.com/…"
+          value={facebookUrl}
+          onChange={(e) => setFacebookUrl(e.target.value)}
+        />
+      </FormField>
+      <FormField label="TikTok" htmlFor="eb-tt">
+        <Input
+          id="eb-tt"
+          type="url"
+          inputMode="url"
+          placeholder="https://tiktok.com/@…"
+          value={tiktokUrl}
+          onChange={(e) => setTiktokUrl(e.target.value)}
         />
       </FormField>
       {error && <p className="text-xs text-accent-700 m-0">{error}</p>}
