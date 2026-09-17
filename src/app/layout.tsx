@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Archivo } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
@@ -12,6 +12,12 @@ const archivo = Archivo({
 export const metadata: Metadata = {
   title: "Turnos",
   description: "Agenda y reservas online para peluquerías y barberías",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
