@@ -9,5 +9,8 @@ const { auth } = NextAuth(authConfig);
 export const proxy = auth;
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // Skip auth on static assets, SW, and the web app manifest so install/PWA works.
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|icons/|sw\\.js|swe-worker|manifest\\.webmanifest|~offline).*)",
+  ],
 };
