@@ -36,11 +36,13 @@ export function ClientSheet({
   open,
   onOpenChange,
   onSaved,
+  onDeleted,
 }: {
   clientId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
+  onDeleted: () => void;
 }) {
   const [client, setClient] = useState<ClientRow | null>(null);
   const [appointments, setAppointments] = useState<HistoryAppointment[]>([]);
@@ -48,6 +50,7 @@ export function ClientSheet({
   const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -105,6 +108,31 @@ export function ClientSheet({
     }
   }
 
+  async function remove() {
+    if (!clientId || !client) return;
+    if (
+      !window.confirm(
+        `¿Eliminar a "${client.name}"? Los turnos ya registrados con este cliente no se ven afectados.`,
+      )
+    ) {
+      return;
+    }
+    setDeleting(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/v1/clients/${clientId}`, { method: "DELETE" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(json.error ?? "No se pudo eliminar.");
+        return;
+      }
+      onOpenChange(false);
+      onDeleted();
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   const visits = appointments.filter((a) => a.status !== "cancelled").length;
 
   return (
@@ -147,8 +175,11 @@ export function ClientSheet({
               </Button>
             </div>
           )}
-          <Button variant="primary" block onClick={save} disabled={saving || !name.trim()}>
+          <Button variant="primary" block onClick={save} disabled={saving || deleting || !name.trim()}>
             {saving ? "Guardando..." : "Guardar"}
+          </Button>
+          <Button variant="ghost" block onClick={remove} disabled={saving || deleting}>
+            {deleting ? "Eliminando..." : "Eliminar cliente"}
           </Button>
           <div className="flex flex-col gap-1">
             <span className="text-[11px] tracking-[0.08em] uppercase opacity-55">Historial</span>

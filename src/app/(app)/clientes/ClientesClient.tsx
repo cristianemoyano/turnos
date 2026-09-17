@@ -91,6 +91,7 @@ export default function ClientesClient() {
         open={!!openId}
         onOpenChange={(open) => !open && setOpenId(null)}
         onSaved={() => setRefresh((r) => r + 1)}
+        onDeleted={() => setRefresh((r) => r + 1)}
       />
     </div>
   );
