@@ -1,0 +1,16 @@
+node_modules
+.next
+.git
+.github
+.cursor
+.agents
+.tmp
+coverage
+docs
+*.md
+.env*
+!.env.example
+infra/.env.production
+docker-compose*.yml
+**/*.test.ts
+**/*.test.tsx

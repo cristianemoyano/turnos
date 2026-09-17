@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import sequelize from "@/lib/db";
 import { slugify } from "@/lib/slug";
 import { Business, User, BusinessHours, Service } from "@/lib/associations";
-import type { SignupInput } from "./business.schema";
+import type { SignupData } from "./business.schema";
 
 const DEFAULT_SHIFTS = [
   { from: "09:00", to: "13:00" },
@@ -41,7 +41,7 @@ export class EmailInUseError extends Error {
   }
 }
 
-export async function signupBusiness(input: SignupInput) {
+export async function signupBusiness(input: SignupData) {
   const existing = await User.findOne({ where: { email: input.email.toLowerCase() } });
   if (existing) throw new EmailInUseError();
 

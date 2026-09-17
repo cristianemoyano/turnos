@@ -7,6 +7,8 @@ import Link from "next/link";
 import { Button } from "@/components/primitives/Button";
 import { Input } from "@/components/primitives/Input";
 import { FormField } from "@/components/primitives/FormField";
+import { isCapEnabled } from "@/lib/cap-config";
+import { solveCapChallenge } from "@/lib/cap-solve";
 
 export default function LoginClient() {
   const router = useRouter();
@@ -19,9 +21,24 @@ export default function LoginClient() {
     const form = new FormData(e.currentTarget);
     setLoading(true);
     try {
+      let capToken: string | null = null;
+      if (isCapEnabled()) {
+        try {
+          capToken = await solveCapChallenge();
+          if (!capToken) {
+            setServerError("No pudimos verificar que sos humano. Probá de nuevo.");
+            return;
+          }
+        } catch {
+          setServerError("No pudimos verificar que sos humano. Probá de nuevo.");
+          return;
+        }
+      }
+
       const result = await signIn("credentials", {
         email: String(form.get("email") || ""),
         password: String(form.get("password") || ""),
+        capToken: capToken ?? undefined,
         redirect: false,
       });
       if (result?.error) {

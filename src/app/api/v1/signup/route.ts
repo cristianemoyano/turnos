@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { signupSchema } from "@/modules/business/business.schema";
 import { signupBusiness, EmailInUseError } from "@/modules/business/business.service";
+import { isCapServerConfigured, verifyCapToken } from "@/lib/cap-verify";
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
@@ -12,8 +13,20 @@ export async function POST(req: Request) {
     );
   }
 
+  if (isCapServerConfigured()) {
+    const capOk = await verifyCapToken(parsed.data.capToken ?? "");
+    if (!capOk) {
+      return NextResponse.json(
+        { error: "Verificación fallida", code: "CAP_FAILED" },
+        { status: 403 },
+      );
+    }
+  }
+
+  const { capToken: _capToken, ...signupData } = parsed.data;
+
   try {
-    const { business } = await signupBusiness(parsed.data);
+    const { business } = await signupBusiness(signupData);
     return NextResponse.json({ data: { slug: business.slug } }, { status: 201 });
   } catch (err) {
     if (err instanceof EmailInUseError) {

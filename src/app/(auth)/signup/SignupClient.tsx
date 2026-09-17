@@ -7,6 +7,8 @@ import { Button } from "@/components/primitives/Button";
 import { Input } from "@/components/primitives/Input";
 import { FormField } from "@/components/primitives/FormField";
 import Link from "next/link";
+import { isCapEnabled } from "@/lib/cap-config";
+import { solveCapChallenge } from "@/lib/cap-solve";
 
 export default function SignupClient() {
   const router = useRouter();
@@ -28,10 +30,24 @@ export default function SignupClient() {
 
     setLoading(true);
     try {
+      let signupCapToken: string | null = null;
+      if (isCapEnabled()) {
+        try {
+          signupCapToken = await solveCapChallenge();
+          if (!signupCapToken) {
+            setServerError("No pudimos verificar que sos humano. Probá de nuevo.");
+            return;
+          }
+        } catch {
+          setServerError("No pudimos verificar que sos humano. Probá de nuevo.");
+          return;
+        }
+      }
+
       const res = await fetch("/api/v1/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, capToken: signupCapToken ?? undefined }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -41,14 +57,33 @@ export default function SignupClient() {
             if (Array.isArray(msgs) && msgs[0]) fieldErrors[field] = msgs[0] as string;
           }
           setErrors(fieldErrors);
+        } else if (json.code === "CAP_FAILED") {
+          setServerError("No pudimos verificar que sos humano. Probá de nuevo.");
         } else {
           setServerError(json.error || "No pudimos crear tu cuenta");
         }
         return;
       }
+
+      // Cap tokens are one-time — solve again for the auto sign-in.
+      let loginCapToken: string | null = null;
+      if (isCapEnabled()) {
+        try {
+          loginCapToken = await solveCapChallenge();
+          if (!loginCapToken) {
+            setServerError("Cuenta creada, pero no pudimos iniciar sesión. Probá ingresar manualmente.");
+            return;
+          }
+        } catch {
+          setServerError("Cuenta creada, pero no pudimos iniciar sesión. Probá ingresar manualmente.");
+          return;
+        }
+      }
+
       const signinResult = await signIn("credentials", {
         email: payload.email,
         password: payload.password,
+        capToken: loginCapToken ?? undefined,
         redirect: false,
       });
       if (signinResult?.error) {

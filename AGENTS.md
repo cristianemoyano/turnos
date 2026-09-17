@@ -7,3 +7,38 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+# AGENTS.md — Turnos
+
+## Project Overview
+
+Turnos is a multi-tenant appointment booking product (salons / studios). Stack: Next.js 16 (App Router), TypeScript, Sequelize, PostgreSQL, NextAuth v5 (Credentials + JWT), Cap CAPTCHA on login/signup.
+
+**Package manager:** `pnpm` only. Never `npm` or `yarn`.
+**Test framework:** Vitest. Never Jest.
+
+## Architecture
+
+- Business logic lives in `src/modules/*/…service.ts`, never in routes or models.
+- Routes are thin: validate → service → response.
+- Models define structure and associations only.
+- Auth edge config: `src/lib/auth.config.ts` + `src/middleware.ts`. Node auth: `src/lib/auth.ts`.
+
+## Production
+
+| Item | Value |
+|------|-------|
+| URL | https://turnos.andiko.cloud |
+| VPS | `ssh root@187.77.235.70` |
+| Repo on VPS | `/root/turnos` |
+| Stack | Docker Swarm `turnos` (app + postgres), nginx edge shared with Andiko |
+| Cap | https://cap.andiko.cloud (site key `turnos-prod`) |
+
+Deploy / hotfix workflows: [`.cursor/skills/prod-deploy/SKILL.md`](.cursor/skills/prod-deploy/SKILL.md) and [`.cursor/skills/prod-hotfix/SKILL.md`](.cursor/skills/prod-hotfix/SKILL.md). Runbook: [`docs/deployment/production.md`](docs/deployment/production.md).
+
+## Core Principles
+
+- Correctness over cleverness — appointment data is real customer time.
+- Explicit over implicit.
+- Never run `make prod-init` on a live stack.
+- `NEXT_PUBLIC_*` (including Cap site key) requires an image rebuild.
