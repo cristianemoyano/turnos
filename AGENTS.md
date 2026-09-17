@@ -12,7 +12,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Project Overview
 
-Turnos is a multi-tenant appointment booking product (salons / studios). Stack: Next.js 16 (App Router), TypeScript, Sequelize, PostgreSQL, NextAuth v5 (Credentials + JWT), Cap CAPTCHA on login/signup.
+Turnos is a multi-tenant appointment booking product (salons / studios). Stack: Next.js 16 (App Router), TypeScript, Sequelize, PostgreSQL, NextAuth v5 (Credentials + JWT), Cap CAPTCHA on login/signup and public booking (create + confirm).
 
 **Package manager:** `pnpm` only. Never `npm` or `yarn`.
 **Test framework:** Vitest. Never Jest.

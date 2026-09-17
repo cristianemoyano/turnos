@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { Appointment, Client, Service, Business } from "@/lib/associations";
 import { dateLabelInTz } from "@/lib/tz";
+import { isCapServerConfigured, verifyCapToken } from "@/lib/cap-verify";
+
+const confirmBodySchema = z.object({
+  capToken: z.string().optional(),
+});
 
 async function loadByToken(token: string) {
   return Appointment.findOne({
@@ -36,8 +42,24 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
   });
 }
 
-export async function POST(_req: Request, { params }: { params: Promise<{ token: string }> }) {
+export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
+  const body = await req.json().catch(() => ({}));
+  const parsed = confirmBodySchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Datos inválidos", code: "VALIDATION_ERROR", details: parsed.error.flatten() },
+      { status: 422 },
+    );
+  }
+
+  if (isCapServerConfigured()) {
+    const capOk = await verifyCapToken(parsed.data.capToken ?? "");
+    if (!capOk) {
+      return NextResponse.json({ error: "Verificación fallida", code: "CAP_FAILED" }, { status: 403 });
+    }
+  }
+
   const appointment = await loadByToken(token);
   if (!appointment) {
     return NextResponse.json({ error: "Turno no encontrado", code: "NOT_FOUND" }, { status: 404 });

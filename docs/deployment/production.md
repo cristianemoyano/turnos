@@ -19,7 +19,7 @@ Day-to-day work is **shipping releases**, not re-running bootstrap.
 ```
 Internet → andiko nginx (:443) → turnos_app (:3000) → turnos_postgres
                 ↑
-           Cap (cap.andiko.cloud) for login / signup
+           Cap (cap.andiko.cloud) for login / signup / public booking
 ```
 
 ## Environment file
@@ -73,7 +73,7 @@ curl -sf https://turnos.andiko.cloud/api/health
 
 ## First tenant
 
-Open https://turnos.andiko.cloud/signup (Cap required in prod). Prefer business slug `andiko` → booking URL `https://turnos.andiko.cloud/r/andiko`.
+Open https://turnos.andiko.cloud/signup (Cap required in prod). Prefer business slug `andiko` → booking URL `https://turnos.andiko.cloud/r/andiko` (Cap also required on public create and `/confirmar/[token]`).
 
 ## Agent skills
 

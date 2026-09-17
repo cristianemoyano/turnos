@@ -7,6 +7,8 @@ import { FormField } from "@/components/primitives/FormField";
 import { Card, CardTitle, CardBody } from "@/components/primitives/Card";
 import { money } from "@/lib/format";
 import { zonedTimeToUtc } from "@/lib/tz";
+import { isCapEnabled } from "@/lib/cap-config";
+import { solveCapChallenge } from "@/lib/cap-solve";
 
 interface ServiceDTO {
   id: string;
@@ -164,6 +166,20 @@ export default function BookingClient({
     setSubmitting(true);
     setServerError("");
     try {
+      let capToken: string | null = null;
+      if (isCapEnabled()) {
+        try {
+          capToken = await solveCapChallenge();
+          if (!capToken) {
+            setServerError("No pudimos verificar que sos humano. Probá de nuevo.");
+            return;
+          }
+        } catch {
+          setServerError("No pudimos verificar que sos humano. Probá de nuevo.");
+          return;
+        }
+      }
+
       const startAt = zonedTimeToUtc(selectedDay.ymd, selectedSlot, timezone).toISOString();
       const res = await fetch(`/api/public/${slug}/appointments`, {
         method: "POST",
@@ -174,14 +190,20 @@ export default function BookingClient({
           startAt,
           name: name.trim(),
           phone: phone.trim(),
+          capToken: capToken ?? undefined,
         }),
       });
       const json: {
         data?: { serviceName: string; dayLabel: string; time: string; professionalName?: string | null };
         error?: string;
+        code?: string;
       } = await res.json();
       if (!res.ok || !json.data) {
-        setServerError(json.error ?? "No pudimos reservar el turno. Probá de nuevo.");
+        if (json.code === "CAP_FAILED") {
+          setServerError("No pudimos verificar que sos humano. Probá de nuevo.");
+        } else {
+          setServerError(json.error ?? "No pudimos reservar el turno. Probá de nuevo.");
+        }
         return;
       }
       setResult({
