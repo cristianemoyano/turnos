@@ -44,6 +44,33 @@ export function StepNegocio({
           onChange={(e) => setBiz({ ...biz, mapsUrl: e.target.value })}
         />
       </FormField>
+      <FormField label="Instagram" hint="Opcional — se muestra en la reserva online">
+        <Input
+          type="url"
+          inputMode="url"
+          placeholder="https://instagram.com/…"
+          value={biz.instagramUrl}
+          onChange={(e) => setBiz({ ...biz, instagramUrl: e.target.value })}
+        />
+      </FormField>
+      <FormField label="Facebook">
+        <Input
+          type="url"
+          inputMode="url"
+          placeholder="https://facebook.com/…"
+          value={biz.facebookUrl}
+          onChange={(e) => setBiz({ ...biz, facebookUrl: e.target.value })}
+        />
+      </FormField>
+      <FormField label="TikTok">
+        <Input
+          type="url"
+          inputMode="url"
+          placeholder="https://tiktok.com/@…"
+          value={biz.tiktokUrl}
+          onChange={(e) => setBiz({ ...biz, tiktokUrl: e.target.value })}
+        />
+      </FormField>
 
       <div className="flex flex-col gap-2">
         <span className="text-[11px] uppercase tracking-wide opacity-55">Profesionales</span>

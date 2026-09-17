@@ -10,6 +10,9 @@ export interface BusinessAttributes extends Timestamps {
   phone: string | null;
   address: string | null;
   maps_url: string | null;
+  instagram_url: string | null;
+  facebook_url: string | null;
+  tiktok_url: string | null;
   slug: string;
   timezone: string;
   trial_ends_at: Date | null;
@@ -18,12 +21,25 @@ export interface BusinessAttributes extends Timestamps {
 
 export type BusinessCreationAttributes = Omit<
   BusinessAttributes,
-  "id" | "created_at" | "updated_at" | "deleted_at" | "timezone" | "trial_ends_at" | "onboarding_completed_at" | "maps_url"
+  | "id"
+  | "created_at"
+  | "updated_at"
+  | "deleted_at"
+  | "timezone"
+  | "trial_ends_at"
+  | "onboarding_completed_at"
+  | "maps_url"
+  | "instagram_url"
+  | "facebook_url"
+  | "tiktok_url"
 > & {
   timezone?: string;
   trial_ends_at?: Date | null;
   onboarding_completed_at?: Date | null;
   maps_url?: string | null;
+  instagram_url?: string | null;
+  facebook_url?: string | null;
+  tiktok_url?: string | null;
 };
 
 export class Business extends Model<BusinessAttributes, BusinessCreationAttributes> {
@@ -32,6 +48,9 @@ export class Business extends Model<BusinessAttributes, BusinessCreationAttribut
   declare phone: string | null;
   declare address: string | null;
   declare maps_url: string | null;
+  declare instagram_url: string | null;
+  declare facebook_url: string | null;
+  declare tiktok_url: string | null;
   declare slug: string;
   declare timezone: string;
   declare trial_ends_at: Date | null;
@@ -48,6 +67,9 @@ Business.init(
     phone: { type: DataTypes.STRING(30) },
     address: { type: DataTypes.STRING(300) },
     maps_url: { type: DataTypes.STRING(500) },
+    instagram_url: { type: DataTypes.STRING(500) },
+    facebook_url: { type: DataTypes.STRING(500) },
+    tiktok_url: { type: DataTypes.STRING(500) },
     slug: { type: DataTypes.STRING(80), allowNull: false, unique: true },
     timezone: { type: DataTypes.STRING(60), allowNull: false, defaultValue: "America/Argentina/Buenos_Aires" },
     trial_ends_at: { type: DataTypes.DATE },

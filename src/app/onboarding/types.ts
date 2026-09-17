@@ -1,4 +1,12 @@
-export type BizDraft = { name: string; phone: string; address: string; mapsUrl: string };
+export type BizDraft = {
+  name: string;
+  phone: string;
+  address: string;
+  mapsUrl: string;
+  instagramUrl: string;
+  facebookUrl: string;
+  tiktokUrl: string;
+};
 export type ProfessionalDraft = { id: string; name: string; phone: string };
 export type ShiftDraft = { from: string; to: string };
 export type DayHoursDraft = { day_of_week: string; is_open: boolean; shifts: ShiftDraft[] };

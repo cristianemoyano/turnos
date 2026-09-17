@@ -22,6 +22,9 @@ type Business = {
   phone: string | null;
   address: string | null;
   maps_url: string | null;
+  instagram_url: string | null;
+  facebook_url: string | null;
+  tiktok_url: string | null;
   slug: string;
   timezone: string;
   trial_ends_at: string | null;
@@ -143,6 +146,29 @@ export default function ConfiguracionClient() {
                 </a>
               </>
             ) : null}
+            {(business?.instagram_url || business?.facebook_url || business?.tiktok_url) && (
+              <>
+                <br />
+                <span className="opacity-70">Redes: </span>
+                {business.instagram_url ? (
+                  <a href={business.instagram_url} target="_blank" rel="noreferrer" className="text-accent">
+                    Instagram
+                  </a>
+                ) : null}
+                {business.instagram_url && business.facebook_url ? " · " : null}
+                {business.facebook_url ? (
+                  <a href={business.facebook_url} target="_blank" rel="noreferrer" className="text-accent">
+                    Facebook
+                  </a>
+                ) : null}
+                {(business.instagram_url || business.facebook_url) && business.tiktok_url ? " · " : null}
+                {business.tiktok_url ? (
+                  <a href={business.tiktok_url} target="_blank" rel="noreferrer" className="text-accent">
+                    TikTok
+                  </a>
+                ) : null}
+              </>
+            )}
           </CardBody>
         </Card>
 
