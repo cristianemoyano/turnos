@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireBusiness } from "@/lib/api-auth";
 import { Client, Appointment, Service } from "@/lib/associations";
+import { softDeleteClient } from "@/modules/clients/client.service";
 import { optionalPhoneSchema } from "@/lib/phone";
 
 const updateSchema = z.object({
@@ -51,4 +52,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (parsed.data.notes !== undefined) client.notes = parsed.data.notes;
   await client.save();
   return NextResponse.json({ data: client });
+}
+
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const authResult = await requireBusiness();
+  if ("error" in authResult) return authResult.error;
+  const { ctx } = authResult;
+  const { id } = await params;
+
+  const result = await softDeleteClient(ctx.businessId, id);
+  if (result === "not_found") {
+    return NextResponse.json({ error: "Cliente no encontrado", code: "NOT_FOUND" }, { status: 404 });
+  }
+
+  return NextResponse.json({ data: { id, removed: true } });
 }

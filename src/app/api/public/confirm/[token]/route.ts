@@ -12,7 +12,7 @@ async function loadByToken(token: string) {
   return Appointment.findOne({
     where: { confirmation_token: token, kind: "appointment" },
     include: [
-      { model: Client, as: "client" },
+      { model: Client, as: "client", paranoid: false },
       { model: Service, as: "service" },
     ],
   });

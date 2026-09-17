@@ -12,7 +12,8 @@ import { optionalPhoneSchema } from "@/lib/phone";
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const includeForDetail = [
-  { model: Client, as: "client" as const },
+  // paranoid: false keeps soft-deleted clients visible in agenda history
+  { model: Client, as: "client" as const, paranoid: false },
   { model: Service, as: "service" as const, include: [{ model: ServiceSegment, as: "segments" as const }] },
   { model: Professional, as: "professional" as const },
 ];
