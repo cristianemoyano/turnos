@@ -42,6 +42,7 @@ export default async function OnboardingPage() {
         name: business.name,
         phone: business.phone ?? "",
         address: business.address ?? "",
+        bankDetails: business.bank_details ?? "",
         mapsUrl: business.maps_url ?? "",
         instagramUrl: business.instagram_url ?? "",
         facebookUrl: business.facebook_url ?? "",

@@ -46,6 +46,7 @@ export default function OnboardingClient({
         name: biz.name,
         phone: biz.phone,
         address: biz.address,
+        bankDetails: biz.bankDetails || null,
         mapsUrl: biz.mapsUrl || null,
         instagramUrl: biz.instagramUrl || null,
         facebookUrl: biz.facebookUrl || null,

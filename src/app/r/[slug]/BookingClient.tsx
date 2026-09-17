@@ -16,6 +16,7 @@ interface ServiceDTO {
   name: string;
   durationMinutes: number;
   price: string;
+  depositAmount: string | null;
 }
 
 interface ProfessionalDTO {
@@ -56,6 +57,7 @@ export default function BookingClient({
   todayKey,
   mapsUrl,
   address,
+  bankDetails,
   instagramUrl,
   facebookUrl,
   tiktokUrl,
@@ -69,6 +71,7 @@ export default function BookingClient({
   todayKey: string;
   mapsUrl: string | null;
   address: string | null;
+  bankDetails: string | null;
   instagramUrl: string | null;
   facebookUrl: string | null;
   tiktokUrl: string | null;
@@ -332,6 +335,9 @@ export default function BookingClient({
                   <CardTitle>{s.name}</CardTitle>
                   <CardBody>
                     {s.durationMinutes} min · {money(s.price)}
+                    {s.depositAmount && Number(s.depositAmount) > 0
+                      ? ` · Seña ${money(s.depositAmount)}`
+                      : ""}
                   </CardBody>
                 </Card>
               </button>
@@ -460,8 +466,24 @@ export default function BookingClient({
                   ? " · Cualquiera disponible"
                   : ""}{" "}
               · {selectedDay.label} {selectedSlot}
+              {selectedService.depositAmount && Number(selectedService.depositAmount) > 0 ? (
+                <>
+                  <br />
+                  Seña requerida: {money(selectedService.depositAmount)}
+                </>
+              ) : null}
             </CardBody>
           </Card>
+          {selectedService.depositAmount &&
+            Number(selectedService.depositAmount) > 0 &&
+            bankDetails?.trim() && (
+              <div className="text-sm text-text/80 border border-divider p-3 whitespace-pre-line">
+                <span className="text-[10px] tracking-[0.08em] uppercase text-text/50 block mb-1">
+                  Datos para transferir la seña
+                </span>
+                {bankDetails.trim()}
+              </div>
+            )}
           <div className="flex flex-col gap-3">
             <FormField label="Nombre" htmlFor="booking-name" required>
               <Input

@@ -2,6 +2,7 @@ export type BizDraft = {
   name: string;
   phone: string;
   address: string;
+  bankDetails: string;
   mapsUrl: string;
   instagramUrl: string;
   facebookUrl: string;

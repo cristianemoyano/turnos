@@ -22,6 +22,7 @@ type Business = {
   name: string;
   phone: string | null;
   address: string | null;
+  bank_details: string | null;
   maps_url: string | null;
   instagram_url: string | null;
   facebook_url: string | null;
@@ -150,6 +151,13 @@ export default function ConfiguracionClient() {
             {business?.phone || "Sin teléfono"}
             <br />
             {business?.address || "Sin dirección"}
+            {business?.bank_details ? (
+              <>
+                <br />
+                <span className="opacity-70">Datos bancarios: </span>
+                <span className="whitespace-pre-line">{business.bank_details}</span>
+              </>
+            ) : null}
             {business?.maps_url ? (
               <>
                 <br />

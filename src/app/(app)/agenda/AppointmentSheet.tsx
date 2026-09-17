@@ -10,11 +10,12 @@ import { Select } from "@/components/primitives/Select";
 import { Checkbox } from "@/components/primitives/Checkbox";
 import { money, formatTimeInTz, minutesToTimeString } from "@/lib/format";
 import { waLink } from "@/lib/whatsapp";
+import { buildAppointmentWhatsAppMessage } from "@/lib/appointment-whatsapp";
 import { zonedTimeToUtc, dateKeyInTz, localMinutesInTz, isStartInPast } from "@/lib/tz";
 import { expandSegments } from "@/modules/agenda/segments";
 import { isStaffOvertimeFit } from "@/modules/agenda/slot-fit";
 import { emptyDayMessage, wantedSlotMessage, type WantedSlotInfo } from "./availabilityCopy";
-import type { DayShift, Professional, RawAppointment, SheetState } from "./types";
+import type { DayShift, Professional, RawAppointment, SheetState, AgendaBusinessInfo } from "./types";
 import { cn } from "@/lib/cn";
 
 function shiftDateKey(dateKey: string, days: number): string {
@@ -33,6 +34,7 @@ export function AppointmentSheet({
   timezone,
   professionals,
   selectedProfessionalId,
+  businessInfo,
 }: {
   sheet: SheetState;
   onClose: () => void;
@@ -43,6 +45,7 @@ export function AppointmentSheet({
   timezone: string;
   professionals: Professional[];
   selectedProfessionalId: string | null;
+  businessInfo: AgendaBusinessInfo;
 }) {
   const [blockMode, setBlockMode] = useState(false);
   const [reason, setReason] = useState("");
@@ -339,6 +342,7 @@ export function AppointmentSheet({
           appointment={appointment}
           stageLabel={sheet.stageLabel}
           timezone={timezone}
+          businessInfo={businessInfo}
           canReschedule={canReschedule}
           onReschedule={startReschedule}
           onConfirmInPerson={() => patchStatus(appointment.id, "confirmed")}
@@ -434,6 +438,7 @@ function AppointmentDetail({
   appointment,
   stageLabel,
   timezone,
+  businessInfo,
   canReschedule,
   onReschedule,
   onConfirmInPerson,
@@ -444,6 +449,7 @@ function AppointmentDetail({
   appointment: RawAppointment;
   stageLabel?: string;
   timezone: string;
+  businessInfo: AgendaBusinessInfo;
   canReschedule: boolean;
   onReschedule: () => void;
   onConfirmInPerson: () => void;
@@ -456,17 +462,27 @@ function AppointmentDetail({
   const clientName = appointment.client?.name || "Sin cliente";
   const heading = stageLabel ? `${clientName} - ${stageLabel}` : clientName;
   const time = formatTimeInTz(new Date(appointment.start_at), timezone);
-  const confirmHref =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/confirmar/${appointment.confirmation_token}`
-      : `/confirmar/${appointment.confirmation_token}`;
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const messageBase = {
+    clientName: appointment.client?.name || "",
+    serviceName: appointment.service?.name,
+    professionalName: appointment.professional?.name,
+    startAt: appointment.start_at,
+    timezone,
+    address: businessInfo.address,
+    depositRequired: appointment.deposit_required,
+    depositPaid: appointment.deposit_paid,
+    bankDetails: businessInfo.bankDetails,
+    confirmationToken: appointment.confirmation_token,
+    origin,
+  };
   const askConfirmHref = waLink(
     appointment.client?.phone,
-    `Hola ${appointment.client?.name}! Confirmá tu turno de ${appointment.service?.name} acá: ${confirmHref}`,
+    buildAppointmentWhatsAppMessage({ ...messageBase, kind: "confirm_request" }),
   );
   const reminderHref = waLink(
     appointment.client?.phone,
-    `Hola ${appointment.client?.name}! Te recordamos tu turno de ${appointment.service?.name}.`,
+    buildAppointmentWhatsAppMessage({ ...messageBase, kind: "reminder" }),
   );
   const hasWait = appointment.service?.segments?.some((s) => s.type === "wait");
   const startInFuture = isStartInFuture(appointment.start_at, timezone);

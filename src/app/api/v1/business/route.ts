@@ -14,6 +14,7 @@ const updateSchema = z.object({
   name: z.string().trim().min(2).max(200).optional(),
   phone: optionalPhoneSchema,
   address: z.string().trim().max(300).nullable().optional(),
+  bankDetails: z.string().trim().max(2000).nullable().optional(),
   mapsUrl: mapsUrlSchema,
   instagramUrl: instagramUrlSchema,
   facebookUrl: facebookUrlSchema,
@@ -45,10 +46,11 @@ export async function PATCH(req: Request) {
   const business = await Business.findByPk(ctx.businessId);
   if (!business) return NextResponse.json({ error: "Negocio no encontrado", code: "NOT_FOUND" }, { status: 404 });
 
-  const { name, phone, address, mapsUrl, instagramUrl, facebookUrl, tiktokUrl } = parsed.data;
+  const { name, phone, address, bankDetails, mapsUrl, instagramUrl, facebookUrl, tiktokUrl } = parsed.data;
   if (name !== undefined) business.name = name;
   if (phone !== undefined) business.phone = phone;
   if (address !== undefined) business.address = address;
+  if (bankDetails !== undefined) business.bank_details = bankDetails;
   if (mapsUrl !== undefined) business.maps_url = mapsUrl;
   if (instagramUrl !== undefined) business.instagram_url = instagramUrl;
   if (facebookUrl !== undefined) business.facebook_url = facebookUrl;
