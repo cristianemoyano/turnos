@@ -217,7 +217,7 @@ export default function ConfiguracionClient() {
             </Button>
             <Button asChild variant="primary" block>
               <a
-                href={waLink(null, `Hola! Podés sacar tu turno en ${bookingUrl}`)}
+                href={waLink(null, `Reservá tu turno: ${bookingUrl}`)}
                 target="_blank"
                 rel="noreferrer"
               >
