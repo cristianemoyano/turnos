@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { signOut, useSession } from "next-auth/react";
 import { Button } from "@/components/primitives/Button";
 import { Input } from "@/components/primitives/Input";
 import { Card, CardKicker, CardTitle, CardBody } from "@/components/primitives/Card";
@@ -62,11 +63,13 @@ function shiftRangeLabel(shifts: Shift[]): string {
 }
 
 export default function ConfiguracionClient() {
+  const { data: session } = useSession();
   const [business, setBusiness] = useState<Business | null>(null);
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [hours, setHours] = useState<DayRow[]>([]);
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [refresh, setRefresh] = useState(0);
+  const [signingOut, setSigningOut] = useState(false);
 
   const [planOpen, setPlanOpen] = useState(false);
   const [editBusinessOpen, setEditBusinessOpen] = useState(false);
@@ -104,6 +107,15 @@ export default function ConfiguracionClient() {
   async function removeBlock(id: string) {
     await fetch(`/api/v1/blocks/${id}`, { method: "DELETE" });
     setRefresh((r) => r + 1);
+  }
+
+  async function handleSignOut() {
+    setSigningOut(true);
+    try {
+      await signOut({ callbackUrl: "/login" });
+    } catch {
+      setSigningOut(false);
+    }
   }
 
   const byDay = new Map(hours.map((h) => [h.day_of_week, h]));
@@ -225,6 +237,20 @@ export default function ConfiguracionClient() {
               </a>
             </Button>
           </div>
+        </Card>
+
+        <Card>
+          <CardKicker>Cuenta</CardKicker>
+          <CardTitle>{session?.user?.email ?? "Sesión activa"}</CardTitle>
+          <CardBody>Cerrá la sesión en este dispositivo.</CardBody>
+          <Button
+            variant="secondary"
+            className="self-start"
+            disabled={signingOut}
+            onClick={handleSignOut}
+          >
+            {signingOut ? "Cerrando…" : "Cerrar sesión"}
+          </Button>
         </Card>
       </div>
 
