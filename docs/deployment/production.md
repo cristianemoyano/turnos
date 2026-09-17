@@ -53,7 +53,7 @@ Required:
 4. `make prod-init` — data dir + Docker secrets. **Never on a live stack.**
 5. `make prod-nginx-http` — install HTTP vhost for ACME.
 6. `make prod-ssl` — expand cert SANs (preserves existing) + install HTTPS vhost.
-7. `make prod-ship TAG=v0.1.0` — build, migrate, deploy, health.
+7. `make prod-ship TAG=v0.1.0` — build, deploy (if stack missing), migrate, deploy, health.
 
 ## Routine release
 
