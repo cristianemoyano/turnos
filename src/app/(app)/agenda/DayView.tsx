@@ -90,15 +90,21 @@ export function DayView({
 }) {
   const nowMinutes = useNowMinutes(isToday, timezone);
   const scrolledToNow = useRef(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     scrolledToNow.current = false;
   }, [isToday]);
 
+  // Scroll only the agenda pane — scrollIntoView can drag the document and unstick nav.
   const nowMarkerRef = useCallback((node: HTMLDivElement | null) => {
     if (!node || scrolledToNow.current) return;
     scrolledToNow.current = true;
-    node.scrollIntoView({ block: "center", inline: "nearest" });
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+    const nodeRect = node.getBoundingClientRect();
+    const scrollerRect = scroller.getBoundingClientRect();
+    scroller.scrollTop += nodeRect.top - scrollerRect.top - scrollerRect.height / 2 + nodeRect.height / 2;
   }, []);
 
   const visible = useMemo(() => {
@@ -133,7 +139,7 @@ export function DayView({
   }
 
   return (
-    <div className="flex-1 overflow-auto pb-24 pt-3">
+    <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pb-24 pt-3">
       {regions.map((region, i) => (
         <ShiftTrack
           key={`${region.kind}-${region.from}-${region.to}`}
