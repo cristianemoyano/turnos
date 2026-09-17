@@ -9,6 +9,7 @@ import { money } from "@/lib/format";
 import { zonedTimeToUtc } from "@/lib/tz";
 import { isCapEnabled } from "@/lib/cap-config";
 import { solveCapChallenge } from "@/lib/cap-solve";
+import { PHONE_HINT, PHONE_PLACEHOLDER, isValidShareablePhone } from "@/lib/phone";
 
 interface ServiceDTO {
   id: string;
@@ -53,6 +54,8 @@ export default function BookingClient({
   businessName,
   timezone,
   todayKey,
+  mapsUrl,
+  address,
   services,
   professionals,
 }: {
@@ -60,6 +63,8 @@ export default function BookingClient({
   businessName: string;
   timezone: string;
   todayKey: string;
+  mapsUrl: string | null;
+  address: string | null;
   services: ServiceDTO[];
   professionals: ProfessionalDTO[];
 }) {
@@ -163,6 +168,10 @@ export default function BookingClient({
 
   async function confirmBooking() {
     if (!selectedService || !selectedDay || !selectedSlot || !name.trim() || !phone.trim()) return;
+    if (!isValidShareablePhone(phone)) {
+      setServerError("Revisá el teléfono: usá un número con código de país (ej. +54 9 11 1234-5678).");
+      return;
+    }
     setSubmitting(true);
     setServerError("");
     try {
@@ -244,6 +253,17 @@ export default function BookingClient({
         <span className="text-[10px] tracking-[0.1em] uppercase text-accent">Reservar turno</span>
         <h1 className="font-heading font-extrabold text-xl leading-tight">{businessName}</h1>
         <p className="text-xs text-text/60">Sin necesidad de crear una cuenta</p>
+        {(address || mapsUrl) && (
+          <p className="text-xs text-text/70 mt-1">
+            {address ? <span>{address}</span> : null}
+            {address && mapsUrl ? " · " : null}
+            {mapsUrl ? (
+              <a href={mapsUrl} target="_blank" rel="noreferrer" className="text-accent">
+                Cómo llegar
+              </a>
+            ) : null}
+          </p>
+        )}
       </header>
 
       {step === 1 && (
@@ -403,13 +423,15 @@ export default function BookingClient({
                 placeholder="Tu nombre"
               />
             </FormField>
-            <FormField label="Teléfono" htmlFor="booking-phone" required>
+            <FormField label="Teléfono" htmlFor="booking-phone" required hint={PHONE_HINT}>
               <Input
                 id="booking-phone"
                 type="tel"
+                inputMode="tel"
+                autoComplete="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="11 1234 5678"
+                placeholder={PHONE_PLACEHOLDER}
               />
             </FormField>
           </div>

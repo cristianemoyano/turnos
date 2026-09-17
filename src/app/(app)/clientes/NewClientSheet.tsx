@@ -5,6 +5,7 @@ import { Sheet } from "@/components/primitives/Sheet";
 import { Button } from "@/components/primitives/Button";
 import { Input } from "@/components/primitives/Input";
 import { FormField } from "@/components/primitives/FormField";
+import { PHONE_HINT, PHONE_PLACEHOLDER } from "@/lib/phone";
 
 export function NewClientSheet({
   open,
@@ -68,13 +69,15 @@ export function NewClientSheet({
       <FormField label="Nombre" htmlFor="nc-name" required>
         <Input id="nc-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
       </FormField>
-      <FormField label="Teléfono" htmlFor="nc-phone">
+      <FormField label="Teléfono" htmlFor="nc-phone" hint={PHONE_HINT}>
         <Input
           id="nc-phone"
           type="tel"
+          inputMode="tel"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           autoComplete="tel"
+          placeholder={PHONE_PLACEHOLDER}
         />
       </FormField>
       {error && <p className="text-xs text-accent-700 m-0">{error}</p>}

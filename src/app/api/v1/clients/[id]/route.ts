@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireBusiness } from "@/lib/api-auth";
 import { Client, Appointment, Service } from "@/lib/associations";
+import { optionalPhoneSchema } from "@/lib/phone";
 
 const updateSchema = z.object({
   name: z.string().trim().min(1).max(200).optional(),
-  phone: z.string().trim().max(30).optional().nullable(),
+  phone: optionalPhoneSchema,
   notes: z.string().max(2000).optional().nullable(),
 });
 
@@ -46,7 +47,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!client) return NextResponse.json({ error: "Cliente no encontrado", code: "NOT_FOUND" }, { status: 404 });
 
   if (parsed.data.name !== undefined) client.name = parsed.data.name;
-  if (parsed.data.phone !== undefined) client.phone = parsed.data.phone || null;
+  if (parsed.data.phone !== undefined) client.phone = parsed.data.phone;
   if (parsed.data.notes !== undefined) client.notes = parsed.data.notes;
   await client.save();
   return NextResponse.json({ data: client });

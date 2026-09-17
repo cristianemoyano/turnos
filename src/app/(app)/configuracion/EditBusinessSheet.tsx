@@ -5,8 +5,14 @@ import { Sheet } from "@/components/primitives/Sheet";
 import { Button } from "@/components/primitives/Button";
 import { Input } from "@/components/primitives/Input";
 import { FormField } from "@/components/primitives/FormField";
+import { PHONE_HINT, PHONE_PLACEHOLDER, isValidShareablePhone } from "@/lib/phone";
 
-type Business = { name: string; phone: string | null; address: string | null };
+type Business = {
+  name: string;
+  phone: string | null;
+  address: string | null;
+  maps_url?: string | null;
+};
 
 export function EditBusinessSheet({
   business,
@@ -22,7 +28,9 @@ export function EditBusinessSheet({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [mapsUrl, setMapsUrl] = useState("");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!open || !business) return;
@@ -34,6 +42,8 @@ export function EditBusinessSheet({
       setName(current.name ?? "");
       setPhone(current.phone ?? "");
       setAddress(current.address ?? "");
+      setMapsUrl(current.maps_url ?? "");
+      setError("");
     }
     sync();
     return () => {
@@ -42,13 +52,32 @@ export function EditBusinessSheet({
   }, [open, business]);
 
   async function submit() {
+    if (phone.trim() && !isValidShareablePhone(phone)) {
+      setError("Revisá el teléfono: necesitamos un número compartible por WhatsApp.");
+      return;
+    }
+    if (mapsUrl.trim() && !/^https?:\/\//i.test(mapsUrl.trim())) {
+      setError("Pegá el link completo de Google Maps (https://…).");
+      return;
+    }
     setSaving(true);
+    setError("");
     try {
-      await fetch("/api/v1/business", {
+      const res = await fetch("/api/v1/business", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, phone: phone || null, address: address || null }),
+        body: JSON.stringify({
+          name,
+          phone: phone.trim() || null,
+          address: address.trim() || null,
+          mapsUrl: mapsUrl.trim() || null,
+        }),
       });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(json.error ?? "No se pudo guardar.");
+        return;
+      }
       onOpenChange(false);
       onSaved();
     } finally {
@@ -62,12 +91,35 @@ export function EditBusinessSheet({
       <FormField label="Nombre" htmlFor="eb-name">
         <Input id="eb-name" value={name} onChange={(e) => setName(e.target.value)} />
       </FormField>
-      <FormField label="Teléfono" htmlFor="eb-phone">
-        <Input id="eb-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+      <FormField label="Teléfono (WhatsApp)" htmlFor="eb-phone" hint={PHONE_HINT}>
+        <Input
+          id="eb-phone"
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel"
+          placeholder={PHONE_PLACEHOLDER}
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+        />
       </FormField>
       <FormField label="Dirección" htmlFor="eb-address">
         <Input id="eb-address" value={address} onChange={(e) => setAddress(e.target.value)} />
       </FormField>
+      <FormField
+        label="Link de Google Maps"
+        htmlFor="eb-maps"
+        hint="Pegá el link para “Cómo llegar” en la reserva online"
+      >
+        <Input
+          id="eb-maps"
+          type="url"
+          inputMode="url"
+          placeholder="https://maps.google.com/…"
+          value={mapsUrl}
+          onChange={(e) => setMapsUrl(e.target.value)}
+        />
+      </FormField>
+      {error && <p className="text-xs text-accent-700 m-0">{error}</p>}
       <Button variant="primary" block onClick={submit} disabled={saving || !name.trim()}>
         {saving ? "Guardando..." : "Guardar"}
       </Button>

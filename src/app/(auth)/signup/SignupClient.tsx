@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/primitives/Button";
 import { Input } from "@/components/primitives/Input";
+import { PasswordInput } from "@/components/primitives/PasswordInput";
 import { FormField } from "@/components/primitives/FormField";
 import Link from "next/link";
 import { isCapEnabled } from "@/lib/cap-config";
@@ -109,7 +110,7 @@ export default function SignupClient() {
         <Input id="email" name="email" type="email" required />
       </FormField>
       <FormField label="Contraseña" htmlFor="password" error={errors.password} hint="Mínimo 8 caracteres" required>
-        <Input id="password" name="password" type="password" minLength={8} required />
+        <PasswordInput id="password" name="password" minLength={8} required autoComplete="new-password" />
       </FormField>
       {serverError && <p className="text-sm text-accent-700 m-0">{serverError}</p>}
       <Button type="submit" variant="primary" block disabled={loading}>

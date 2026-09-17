@@ -1,5 +1,8 @@
-/** Builds a wa.me deep link. `phone` may be null (e.g. generic confirmation with no reply-to). */
+import { toWhatsAppDigits } from "@/lib/phone";
+
+/** Builds a wa.me deep link. `phone` may be null (generic share with no reply-to). */
 export function waLink(phone: string | null | undefined, message: string): string {
-  const digits = ("54" + (phone || "")).replace(/\D/g, "");
-  return "https://wa.me/" + digits + "?text=" + encodeURIComponent(message);
+  const digits = toWhatsAppDigits(phone);
+  const base = digits ? `https://wa.me/${digits}` : "https://wa.me/";
+  return `${base}?text=${encodeURIComponent(message)}`;
 }

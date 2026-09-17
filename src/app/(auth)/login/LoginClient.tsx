@@ -6,6 +6,7 @@ import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { Button } from "@/components/primitives/Button";
 import { Input } from "@/components/primitives/Input";
+import { PasswordInput } from "@/components/primitives/PasswordInput";
 import { FormField } from "@/components/primitives/FormField";
 import { isCapEnabled } from "@/lib/cap-config";
 import { solveCapChallenge } from "@/lib/cap-solve";
@@ -58,7 +59,7 @@ export default function LoginClient() {
         <Input id="email" name="email" type="email" required />
       </FormField>
       <FormField label="Contraseña" htmlFor="password" required>
-        <Input id="password" name="password" type="password" required />
+        <PasswordInput id="password" name="password" required autoComplete="current-password" />
       </FormField>
       {serverError && <p className="text-sm text-accent-700 m-0">{serverError}</p>}
       <Button type="submit" variant="primary" block disabled={loading}>

@@ -21,6 +21,7 @@ type Business = {
   name: string;
   phone: string | null;
   address: string | null;
+  maps_url: string | null;
   slug: string;
   timezone: string;
   trial_ends_at: string | null;
@@ -134,6 +135,14 @@ export default function ConfiguracionClient() {
             {business?.phone || "Sin teléfono"}
             <br />
             {business?.address || "Sin dirección"}
+            {business?.maps_url ? (
+              <>
+                <br />
+                <a href={business.maps_url} target="_blank" rel="noreferrer" className="text-accent">
+                  Ver en Google Maps
+                </a>
+              </>
+            ) : null}
           </CardBody>
         </Card>
 

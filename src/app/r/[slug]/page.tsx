@@ -22,7 +22,7 @@ export default async function PublicBookingPage({
   const { slug } = await params;
   const business = await Business.findOne({
     where: { slug },
-    attributes: ["id", "name", "slug", "timezone"],
+    attributes: ["id", "name", "slug", "timezone", "maps_url", "address"],
   });
   if (!business) notFound();
 
@@ -45,6 +45,8 @@ export default async function PublicBookingPage({
       businessName={business.name}
       timezone={business.timezone}
       todayKey={dateKeyInTz(new Date(), business.timezone)}
+      mapsUrl={business.maps_url}
+      address={business.address}
       services={services.map((s) => ({
         id: s.id,
         name: s.name,

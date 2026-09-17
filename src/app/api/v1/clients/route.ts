@@ -3,10 +3,11 @@ import { z } from "zod";
 import { Op } from "sequelize";
 import { requireBusiness } from "@/lib/api-auth";
 import { Client, Appointment } from "@/lib/associations";
+import { optionalPhoneSchema } from "@/lib/phone";
 
 const createSchema = z.object({
   name: z.string().trim().min(1).max(200),
-  phone: z.string().trim().max(30).optional().nullable(),
+  phone: optionalPhoneSchema,
 });
 
 export async function GET(req: Request) {
@@ -65,7 +66,7 @@ export async function POST(req: Request) {
   const client = await Client.create({
     business_id: ctx.businessId,
     name: parsed.data.name,
-    phone: parsed.data.phone || null,
+    phone: parsed.data.phone ?? null,
     notes: null,
   });
   return NextResponse.json({ data: client }, { status: 201 });

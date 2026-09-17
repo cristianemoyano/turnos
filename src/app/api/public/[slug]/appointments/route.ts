@@ -9,13 +9,14 @@ import { whyDoesNotFit } from "@/modules/agenda/slot-fit";
 import { formatTimeInTz } from "@/lib/format";
 import { dateKeyInTz, isStartInPast } from "@/lib/tz";
 import { isCapServerConfigured, verifyCapToken } from "@/lib/cap-verify";
+import { requiredPhoneSchema } from "@/lib/phone";
 
 const bodySchema = z.object({
   serviceId: z.string().uuid(),
   professionalId: z.string().uuid().optional(),
   startAt: z.string().datetime({ offset: true }).or(z.string().datetime()),
   name: z.string().trim().min(2).max(200),
-  phone: z.string().trim().min(6).max(30),
+  phone: requiredPhoneSchema,
   capToken: z.string().optional(),
 });
 
@@ -110,6 +111,8 @@ export async function POST(
             transaction: t,
           });
 
+      // Lock only Appointment rows. Postgres rejects FOR UPDATE on the nullable
+      // side of LEFT OUTER JOINs (services / segments includes).
       const candidates = await Appointment.findAll({
         where: {
           business_id: business.id,
@@ -125,7 +128,7 @@ export async function POST(
         },
         include: [{ model: Service, as: "service", include: [{ model: ServiceSegment, as: "segments" }] }],
         transaction: t,
-        lock: t.LOCK.UPDATE,
+        lock: { level: t.LOCK.UPDATE, of: Appointment },
       });
       const overlapping = candidates.filter((a) =>
         rangesOverlap(

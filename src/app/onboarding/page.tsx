@@ -38,7 +38,12 @@ export default async function OnboardingPage() {
 
   return (
     <OnboardingClient
-      business={{ name: business.name, phone: business.phone ?? "", address: business.address ?? "" }}
+      business={{
+        name: business.name,
+        phone: business.phone ?? "",
+        address: business.address ?? "",
+        mapsUrl: business.maps_url ?? "",
+      }}
       initialProfessionals={professionals.map((p) => ({ id: p.id, name: p.name, phone: p.phone ?? "" }))}
       initialHours={hours}
       initialServices={services.map((s) => ({

@@ -42,7 +42,12 @@ export default function OnboardingClient({
     await fetch("/api/v1/business", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: biz.name, phone: biz.phone, address: biz.address }),
+      body: JSON.stringify({
+        name: biz.name,
+        phone: biz.phone,
+        address: biz.address,
+        mapsUrl: biz.mapsUrl || null,
+      }),
     });
 
     for (const pr of professionals) {

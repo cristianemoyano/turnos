@@ -7,6 +7,7 @@ import { Appointment, Business, Client, Professional, Service, ServiceSegment } 
 import { zonedTimeToUtc, hasConflict, segmentsFromService } from "@/modules/agenda/availability.service";
 import { wallClockMinutes } from "@/modules/agenda/segments";
 import { isStartInPast } from "@/lib/tz";
+import { optionalPhoneSchema } from "@/lib/phone";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -42,7 +43,7 @@ export async function GET(req: Request) {
 
 const newClientSchema = z.object({
   name: z.string().trim().min(1).max(200),
-  phone: z.string().trim().max(30).optional().nullable(),
+  phone: optionalPhoneSchema,
 });
 
 const appointmentSchema = z.object({
@@ -151,7 +152,7 @@ export async function POST(req: Request) {
       let clientId = input.client_id ?? null;
       if (!clientId && input.client) {
         const client = await Client.create(
-          { business_id: ctx.businessId, name: input.client.name, phone: input.client.phone || null, notes: null },
+          { business_id: ctx.businessId, name: input.client.name, phone: input.client.phone ?? null, notes: null },
           { transaction: t },
         );
         clientId = client.id;

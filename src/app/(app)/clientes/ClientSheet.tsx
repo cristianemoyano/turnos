@@ -7,6 +7,7 @@ import { Input, Textarea } from "@/components/primitives/Input";
 import { FormField } from "@/components/primitives/FormField";
 import { money } from "@/lib/format";
 import { waLink } from "@/lib/whatsapp";
+import { PHONE_HINT, PHONE_PLACEHOLDER } from "@/lib/phone";
 
 type ClientRow = {
   id: string;
@@ -119,13 +120,15 @@ export function ClientSheet({
           <FormField label="Nombre" htmlFor="client-name" required>
             <Input id="client-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
           </FormField>
-          <FormField label="Teléfono" htmlFor="client-phone">
+          <FormField label="Teléfono" htmlFor="client-phone" hint={PHONE_HINT}>
             <Input
               id="client-phone"
               type="tel"
+              inputMode="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               autoComplete="tel"
+              placeholder={PHONE_PLACEHOLDER}
             />
           </FormField>
           <FormField label="Notas" htmlFor="client-notes">

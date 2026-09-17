@@ -3,6 +3,7 @@
 import { Input } from "@/components/primitives/Input";
 import { FormField } from "@/components/primitives/FormField";
 import { Button } from "@/components/primitives/Button";
+import { PHONE_HINT, PHONE_PLACEHOLDER } from "@/lib/phone";
 import type { BizDraft, ProfessionalDraft } from "./types";
 
 export function StepNegocio({
@@ -21,11 +22,27 @@ export function StepNegocio({
       <FormField label="Nombre del negocio">
         <Input value={biz.name} onChange={(e) => setBiz({ ...biz, name: e.target.value })} />
       </FormField>
-      <FormField label="Teléfono (WhatsApp)">
-        <Input value={biz.phone} onChange={(e) => setBiz({ ...biz, phone: e.target.value })} />
+      <FormField label="Teléfono (WhatsApp)" hint={PHONE_HINT}>
+        <Input
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel"
+          placeholder={PHONE_PLACEHOLDER}
+          value={biz.phone}
+          onChange={(e) => setBiz({ ...biz, phone: e.target.value })}
+        />
       </FormField>
       <FormField label="Dirección">
         <Input value={biz.address} onChange={(e) => setBiz({ ...biz, address: e.target.value })} />
+      </FormField>
+      <FormField label="Link de Google Maps" hint="Opcional — se muestra en la reserva online">
+        <Input
+          type="url"
+          inputMode="url"
+          placeholder="https://maps.google.com/…"
+          value={biz.mapsUrl}
+          onChange={(e) => setBiz({ ...biz, mapsUrl: e.target.value })}
+        />
       </FormField>
 
       <div className="flex flex-col gap-2">
@@ -43,7 +60,8 @@ export function StepNegocio({
                 }}
               />
               <Input
-                placeholder="Teléfono"
+                type="tel"
+                placeholder={PHONE_PLACEHOLDER}
                 value={pr.phone}
                 onChange={(e) => {
                   const next = [...professionals];
