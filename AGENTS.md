@@ -42,3 +42,14 @@ Deploy / hotfix workflows: [`.cursor/skills/prod-deploy/SKILL.md`](.cursor/skill
 - Explicit over implicit.
 - Never run `make prod-init` on a live stack.
 - `NEXT_PUBLIC_*` (including Cap site key) requires an image rebuild.
+
+## Progressive Web App (install)
+
+Turnos is installable as a PWA (one product manifest for staff + public booking).
+
+- **Stack:** `@serwist/next` + `serwist`, App Router `src/app/manifest.ts`, icons in `public/icons/`, SW source `src/app/sw.ts` (build emits `public/sw.js`).
+- **Build:** `pnpm build` runs `next build --webpack` (required — Serwist is a webpack plugin; Next 16 Turbopack build cannot inject the SW).
+- **Android (Chrome):** open https://turnos.andiko.cloud → browser menu → **Install app** / **Agregar a la pantalla de inicio**.
+- **iOS (Safari):** Share → **Add to Home Screen**. iOS does not use the service worker the same way for install prompts; Add to Home Screen is the supported path. Standalone works after that; push/background sync remain limited vs Android.
+- **Offline:** shell/assets may load from cache; agenda data still needs network. Fallback page: `/~offline`.
+
