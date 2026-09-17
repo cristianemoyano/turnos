@@ -13,7 +13,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!business?.onboarding_completed_at) redirect("/onboarding");
 
   return (
-    <div className="mx-auto flex h-dvh max-h-dvh w-full max-w-[480px] flex-col overflow-hidden bg-bg">
+    <div className="mx-auto flex h-dvh max-h-dvh w-full max-w-[480px] flex-col overflow-hidden overscroll-none bg-bg">
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
       <BottomNav />
     </div>

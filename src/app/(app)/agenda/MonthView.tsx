@@ -35,7 +35,7 @@ export function MonthView({ monthKey, todayKey, onSelectDay }: { monthKey: strin
   }
 
   return (
-    <div className="flex-1 overflow-auto p-4">
+    <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-4">
       <div className="text-sm font-semibold mb-2.5 capitalize">{monthLabel}</div>
       <div className="grid grid-cols-7 gap-1 mb-1.5">
         {WEEKDAY_LETTERS.map((l, i) => (

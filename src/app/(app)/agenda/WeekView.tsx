@@ -23,7 +23,7 @@ export function WeekView({ startKey, todayKey, onSelectDay }: { startKey: string
   if (!days) return <p className="p-5 text-sm opacity-60">Cargando...</p>;
 
   return (
-    <div className="flex-1 overflow-auto p-4 flex flex-col gap-2">
+    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-y-contain p-4">
       {days.map((d) => {
         const dateObj = new Date(d.date + "T00:00:00");
         const dayName = new Intl.DateTimeFormat("es-AR", { weekday: "short" }).format(dateObj);
